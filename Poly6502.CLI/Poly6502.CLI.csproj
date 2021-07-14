@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net5.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Poly6502.Ram\Poly6502.Ram.csproj" />
+      <ProjectReference Include="..\Poly6502.Utilities\Poly6502.Utilities.csproj" />
+      <ProjectReference Include="..\Poly6502\Poly6502.csproj" />
+    </ItemGroup>
+
+
+</Project>
