@@ -15,7 +15,7 @@ namespace Poly6502.Utilities
 
         protected byte _dataBusData;
         protected bool _cpuRead;
-        protected ushort _addressLocation;
+        protected ushort _addressBusAddress;
 
         public AbstractAddressDataBus()
         {
@@ -46,9 +46,9 @@ namespace Poly6502.Utilities
                 AddressBusLines.Add(i, (inputVoltage) =>
                 {
                     if (inputVoltage > 0)
-                        _addressLocation |= (ushort) (1 << i1);
+                        _addressBusAddress |= (ushort) (1 << i1);
                     else
-                        _addressLocation &= (ushort) ~(1 << i1);
+                        _addressBusAddress &= (ushort) ~(1 << i1);
                 });
             }
         }

@@ -11,8 +11,9 @@ namespace Poly6502.Ram
         {
             _ram = new byte[0xFFFF];
 
-            // _ram[0xFFFC] = 0xFA;
-            // _ram[0xFFFD] = 0xFC;
+             _ram[0xFFFC] = 0x05;
+             _ram[0xFFFD] = 0xFC;
+             _ram[0x0505] = 0xAA;
         }
 
         public override void SetRW(bool rw)
@@ -29,13 +30,13 @@ namespace Poly6502.Ram
                 OutputDataToDatabus();
             else //read any data into ram
             {
-                _ram[_addressLocation] = _dataBusData;
+                _ram[_addressBusAddress] = _dataBusData;
             }
         }
 
         private void OutputDataToDatabus()
         {
-            var data = _ram[_addressLocation];
+            var data = _ram[_addressBusAddress];
 
             foreach(var device in _dataCompatibleDevices)
             {
