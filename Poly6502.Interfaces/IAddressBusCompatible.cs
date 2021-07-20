@@ -7,6 +7,6 @@ namespace Poly6502.Interfaces
     {
         Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
-        void RegisterAddressCompatibleDevice(IAddressBusCompatible device);
+        void RegisterDevice(IAddressBusCompatible device);
     }
 }

@@ -30,7 +30,7 @@ namespace Poly6502.Utilities
             }
         }
         
-        public void RegisterDataCompatibleDevice(IDataBusCompatible device)
+        public void RegisterDevice(IDataBusCompatible device)
         {
             _dataBusCompatiblesDevices.Add(device);
         }
@@ -38,6 +38,11 @@ namespace Poly6502.Utilities
         public void SetRW(bool rw)
         {
             _cpuRead = rw;
+        }
+
+        public void PropagationOverride(bool ovr, object invoker)
+        {
+            
         }
 
         public abstract void Clock();

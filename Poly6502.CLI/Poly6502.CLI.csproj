@@ -8,7 +8,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Poly6502.Ram\Poly6502.Ram.csproj" />
       <ProjectReference Include="..\Poly6502.Utilities\Poly6502.Utilities.csproj" />
-      <ProjectReference Include="..\Poly6502\Poly6502.csproj" />
+      <ProjectReference Include="..\Poly6502.Microprocessor\Poly6502.Microprocessor.csproj" />
     </ItemGroup>
 
 

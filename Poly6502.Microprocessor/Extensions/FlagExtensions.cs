@@ -1,6 +1,6 @@
-using Poly6502.Flags;
+using Poly6502.Microprocessor.Flags;
 
-namespace Poly6502.Extensions
+namespace Poly6502.Microprocessor.Extensions
 {
     public static class FlagExtensions
     {

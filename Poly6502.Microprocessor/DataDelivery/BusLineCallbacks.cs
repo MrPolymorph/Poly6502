@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Poly6502.DataDelivery
+namespace Poly6502.Microprocessor.DataDelivery
 {
     public class BusLineCallbacks
     {

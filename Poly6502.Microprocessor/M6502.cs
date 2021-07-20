@@ -1,28 +1,32 @@
 ﻿using System;
-using Poly6502.DataDelivery;
-using Poly6502.Extensions;
-using Poly6502.Flags;
+using System.Collections.Generic;
+using Poly6502.Microprocessor.Extensions;
+using Poly6502.Microprocessor.Flags;
 using Poly6502.Utilities;
 
-namespace Poly6502
+namespace Poly6502.Microprocessor
 {
     /// <summary>
     /// The 6502 is a little-endian 8-bit processor with a 16-bit address bus.
     ///
     /// The 6502 typically runs at 1 to 2Mhz
     /// </summary>
-    public class Processor : AbstractAddressDataBus
+    public class M6502 : AbstractAddressDataBus
     {
-        #region Main Registers
+        private bool _pcFetchComplete;
+        private bool _addressingModeInProgress;
+        private bool _opCodeInProgress;
+        private int _instructionCycles;
+        private int _addressingModeCycles;
+        private int _pcCurrentFetchCycle;
+        private ushort _indirectAddress;
+
+        private Dictionary<AddressingMode, Action> _addressingMethodLookup;
 
         /// <summary>
         /// Accumulator
         /// </summary>
         public byte A { get; private set; }
-
-        #endregion
-
-        #region IndexRegisters
 
         /// <summary>
         /// X Register
@@ -39,52 +43,41 @@ namespace Poly6502
         /// </summary>
         public byte SP { get; private set; }
 
-        #endregion
+        
+        public ushort PC { get; private set; }
 
-        #region ProgramCounter
-
-        /// <summary>
-        /// Program Counter
-        /// </summary>
-        public ushort Pc { get; private set; }
-
-        #endregion
-
-
-        #region StatusRegister
+        public byte InstructionLoByte { get; set; }
+        public byte InstructionHiByte { get; set; }
 
         /// <summary>
         /// Status Register / Processor Flags
         /// </summary>
         public StatusRegister P { get; private set; }
 
-        #endregion
+        public byte OpCode { get; private set; }
 
-        private byte _opCode;
-        private ushort _indirectAddress;
-        private ushort _absoluteAddress;
+        public byte OpCodeData { get; private set; }
 
-        #region Hardware Emulation
-
-        private bool _pcFetchComplete;
-        private bool _addressingModeInProgress;
-        private bool _opCodeInProgress;
-        private byte _instructionLoByte;
-        private byte _instructionHiByte;
-        private int _instructionCycles;
-        private int _addressingModeCycles;
-        private int _pcCurrentFetchCycle;
 
         public float InputVoltage { get; private set; }
 
-        #endregion
+        public ushort AbsoluteAddress { get; private set; }
 
-        public Processor()
+
+        public M6502()
         {
-            _pcCurrentFetchCycle = 2;
-            _indirectAddress = 0;
-            _addressingModeCycles = 0;
-            _addressingModeInProgress = false;
+            _addressingMethodLookup = new Dictionary<AddressingMode, Action>()
+            {
+                {AddressingMode.Absolute, ABS},
+                {AddressingMode.Accumulator, ACC},
+                {AddressingMode.ZeroPage, ZPA},
+                {AddressingMode.ZeroPageX, ZPX},
+                {AddressingMode.Indirect, IND},
+                {AddressingMode.Relative, REL},
+                {AddressingMode.Immediate, IMM},
+            };
+
+            RES();
         }
 
 
@@ -118,6 +111,19 @@ namespace Poly6502
         /// </summary>
         public void IMM()
         {
+            switch (_addressingModeCycles)
+            {
+                case 0:
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
+                    break;
+                case 1:
+                    OpCodeData = DataBusData;
+                    _addressingModeInProgress = false;
+                    break;
+            }
+
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -131,6 +137,31 @@ namespace Poly6502
         /// </summary>
         public void ABS()
         {
+            if (!_addressingModeInProgress)
+            {
+                _addressingModeInProgress = true;
+            }
+
+            switch (_addressingModeCycles)
+            {
+                case 0: //set the address bus to get the lo byte of the address
+                {
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
+                    break;
+                }
+                case 1:
+                    InstructionLoByte = DataBusData;
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
+                    break;
+                case 2:
+                    InstructionHiByte = DataBusData;
+                    _addressingModeInProgress = false;
+                    break;
+            }
+
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -145,28 +176,53 @@ namespace Poly6502
         /// </summary>
         public void ZPA()
         {
+            if (!_addressingModeInProgress)
+            {
+                _addressingModeInProgress = true;
+            }
+
             switch (_addressingModeCycles)
             {
-                /*
-                 * Set address bus to the program counter
-                 */
-                case 2:
-                    _addressBusAddress = Pc;
-                    Pc++;
+                case (0):
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
                     break;
-                /*
-                 * Read the absolute address from the
-                 * data bus
-                 *
-                 * complete address mode
-                 */
-                case 1:
-                    _addressBusAddress = (ushort) (_dataBusData & 0x00FF);
+                case (1):
+                    OpCodeData = DataBusData &= 0x00FF;
+                    _addressingModeInProgress = false;
+                    AddressBusAddress++;
+                    break;
+            }
+
+            _addressingModeCycles++;
+        }
+
+        /// <summary>
+        /// Zero Page Addressing with X offset.
+        ///
+        /// 
+        /// </summary>
+        public void ZPX()
+        {
+            if (!_addressingModeInProgress)
+            {
+                _addressingModeInProgress = true;
+            }
+
+            switch (_addressingModeCycles)
+            {
+                case (0):
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
+                    break;
+                case (1):
+                    AddressBusAddress = (ushort) ((DataBusData + X) & 0x00FF);
+                    OutputAddressToPins(AddressBusAddress);
                     _addressingModeInProgress = false;
                     break;
             }
 
-            _addressingModeCycles--;
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -278,20 +334,18 @@ namespace Poly6502
                 /*
                  * Setup address to read from memory at location PC
                  */
-                case 5:
-                    _addressBusAddress = Pc;
-                    OutputAddressToPins();
+                case 0:
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * Save data from the data bus
                  * increment PC
                  * setup address to read from memory at PC
                  */
-                case 4:
-                    _instructionLoByte = _dataBusData;
-                    Pc++;
-                    _addressBusAddress = Pc;
-                    OutputAddressToPins();
+                case 1:
+                    InstructionLoByte = DataBusData;
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * Save data from the data bus
@@ -299,39 +353,42 @@ namespace Poly6502
                  * increment PC
                  * setup address to read from _indirectAddress
                  */
-                case 3:
-                    _instructionHiByte = _dataBusData;
-                    _indirectAddress = (ushort) ((_instructionHiByte << 8) | _instructionLoByte);
+                case 2:
+                    InstructionHiByte = DataBusData;
+                    _indirectAddress = (ushort) ((InstructionHiByte << 8) | InstructionLoByte);
 
-                    Pc++;
-                    if (_instructionLoByte == 0x00FF)
-                        _addressBusAddress = (ushort) (_indirectAddress & 0xFF00);
+                    AddressBusAddress++;
+                    if (InstructionLoByte == 0x00FF)
+                        AddressBusAddress = (ushort) (_indirectAddress & 0xFF00);
                     else
-                        _addressBusAddress = (ushort) (_indirectAddress + 1);
+                        AddressBusAddress = (ushort) (_indirectAddress + 1);
 
-                    OutputAddressToPins();
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * Save data from the data bus
                  * Setup address to read from _indirectAddress
                  */
-                case 2:
-                    _absoluteAddress = (ushort) (_dataBusData << 8);
-                    _addressBusAddress = _indirectAddress;
-                    OutputAddressToPins();
+                case 3:
+                    AbsoluteAddress = (ushort) (DataBusData << 8);
+                    AddressBusAddress = _indirectAddress;
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * Combine all answers to give final absolute address.
                  * Setup the address to read from that location.
                  */
-                case 1:
-                    _addressBusAddress = (ushort) (_absoluteAddress | _dataBusData);
-                    OutputDataBus();
+                case 4:
+                    AddressBusAddress = (ushort) (AbsoluteAddress | DataBusData);
+                    OutputDataToDatabus();
+                    break;
+                case 5:
+                    OpCodeData = DataBusData;
                     _addressingModeInProgress = false;
                     break;
             }
 
-            _addressingModeCycles--;
+            _addressingModeCycles++;
         }
 
         #endregion
@@ -353,62 +410,44 @@ namespace Poly6502
         }
 
         /// <summary>
-        /// Shift left One Bit(Memory or Accumulator)
+        /// Shift left One Bit (Memory or Accumulator)
         /// </summary>
         public void ASL(AddressingMode mode)
         {
-            if (!_opCodeInProgress)
-            {
-                _opCodeInProgress = true;
-                _instructionCycles = 0;
-
-                switch (mode)
-                {
-                    case AddressingMode.ZeroPage:
-                        _addressingModeInProgress = true;
-                        _addressingModeCycles = 2;
-                        break;
-                }
-            }
+            BeginOpCode();
 
             if (_addressingModeInProgress)
             {
-                switch (mode)
-                {
-                    case AddressingMode.ZeroPage:
-                        ZPA();
-                        break;
-                }
+                _addressingMethodLookup[mode]();
             }
             else
             {
-                P.Set(StatusRegister.C, (_dataBusData & 0xFF00) > 0);
-                P.Set(StatusRegister.Z, (_dataBusData & 0x00FF) == 0);
-                P.Set(StatusRegister.N, (_dataBusData & 0x80) == 1);
+                P.Set(StatusRegister.C, (DataBusData & 0xFF00) > 0);
+                P.Set(StatusRegister.Z, (DataBusData & 0x00FF) == 0);
+                P.Set(StatusRegister.N, (DataBusData & 0x80) == 1);
 
-                if (mode == AddressingMode.Implied)
-                    A = (byte) (_dataBusData & 0x00FF);
+                if (mode == AddressingMode.Implicit)
+                    A = (byte) (DataBusData & 0x00FF);
                 else
                     _instructionCycles++;
 
                 switch (_instructionCycles)
                 {
-                    case 1:
-                        _cpuRead = false;
-                        UpdateRw();
-                        OutputAddressToPins();
-                        _dataBusData &= 0x00FF;
-                        break;
                     case 0:
+                        CpuRead = false;
+                        UpdateRw();
+                        OutputAddressToPins(AddressBusAddress);
+                        DataBusData &= 0x00FF;
+                        break;
+                    case 1:
                         _opCodeInProgress = false;
-                        _cpuRead = true;
+                        CpuRead = true;
                         UpdateRw();
                         break;
                 }
-                
             }
 
-            _instructionCycles--;
+            _instructionCycles++;
         }
 
         /// <summary>
@@ -451,6 +490,19 @@ namespace Poly6502
         /// </summary>
         public void BNE()
         {
+            BeginOpCode();
+            
+            if ((P & StatusRegister.Z) == 0)
+            {
+                _instructionCycles++;
+
+
+                //crossing page boundary check
+                if ((AbsoluteAddress & 0xFF00) != (AddressBusAddress & 0xFF00))
+
+                    AddressBusAddress = AbsoluteAddress;
+                OutputAddressToPins(AddressBusAddress);
+            }
         }
 
         /// <summary>
@@ -465,12 +517,8 @@ namespace Poly6502
         /// </summary>
         public void BRK()
         {
-            if (!_opCodeInProgress)
-            {
-                _opCodeInProgress = true;
-                _instructionCycles = 5;
-            }
-            
+            BeginOpCode();
+
             switch (_instructionCycles)
             {
                 /*
@@ -479,12 +527,12 @@ namespace Poly6502
                  * Write the hi byte of the program counter to the data bus
                  * decrement stack pointer for next operation
                  */
-                case(5):
-                    _cpuRead = false;
+                case (0):
+                    CpuRead = false;
                     UpdateRw();
-                    _addressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins();
-                    _dataBusData = (byte) ((Pc >> 8) & 0x00FF);
+                    AddressBusAddress = (ushort) (0x0100 + SP);
+                    OutputAddressToPins(AddressBusAddress);
+                    DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
                     SP--;
 
                     P |= StatusRegister.I;
@@ -495,10 +543,10 @@ namespace Poly6502
                  * decrement the stack pointer for next operation
                  * 
                  */
-                case(4):
-                    _addressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins();
-                    _dataBusData = (byte) (Pc & 0x00FF);
+                case (1):
+                    AddressBusAddress = (ushort) (0x0100 + SP);
+                    OutputAddressToPins(AddressBusAddress);
+                    DataBusData = (byte) (AddressBusAddress & 0x00FF);
                     SP--;
                     break;
                 /*
@@ -506,10 +554,10 @@ namespace Poly6502
                  * Write the current status register to the data bus
                  * decrement the stack pointer for next operation
                  */
-                case(3):
-                    _addressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins();
-                    _dataBusData = (byte) P;
+                case (2):
+                    AddressBusAddress = (ushort) (0x0100 + SP);
+                    OutputAddressToPins(AddressBusAddress);
+                    DataBusData = (byte) P;
                     P |= StatusRegister.B;
                     SP--;
                     break;
@@ -517,34 +565,34 @@ namespace Poly6502
                  * Tell everyone we now want to read
                  * Set the address bus to address 0xFFFE
                  */
-                case(2):
-                    _cpuRead = true;
+                case (3):
+                    CpuRead = true;
                     UpdateRw();
-                    _addressBusAddress = 0xFFFE;
-                    OutputAddressToPins();
+                    AddressBusAddress = 0xFFFE;
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * read the data from the databus into the PC.
                  * Set the address bus to address 0xFFFF
                  */
-                case(1):
-                    Pc = 0x0000;
-                    Pc = _dataBusData;
-                    _addressBusAddress = 0xFFFF;
-                    OutputAddressToPins();
+                case (4):
+                    AddressBusAddress = 0x0000;
+                    AddressBusAddress = DataBusData;
+                    AddressBusAddress = 0xFFFF;
+                    OutputAddressToPins(AddressBusAddress);
                     break;
                 /*
                  * Read the data bus into the hi byte of the PC
                  * Opcode Complete
                  */
-                case(0):
-                    Pc = (ushort) (_dataBusData << 8);
+                case (5):
+                    AddressBusAddress = (ushort) (DataBusData << 8);
                     _opCodeInProgress = false;
                     P &= ~StatusRegister.B;
                     break;
             }
 
-            _instructionCycles--;
+            _instructionCycles++;
         }
 
         /// <summary>
@@ -595,9 +643,29 @@ namespace Poly6502
         /// <summary>
         /// Compare Memory and Accumulator 
         /// </summary>
-        public void CMP()
+        public void CMP(AddressingMode mode)
         {
+            BeginOpCode();
+
+            if (_addressingModeInProgress)
+            {
+                _addressingMethodLookup[mode]();
+            }
+            else
+            {
+                switch (_instructionCycles)
+                {
+                    case (0):
+                        var comparison = A - DataBusData;
+                        P.Set(StatusRegister.C, A >= DataBusData);
+                        P.Set(StatusRegister.Z, (comparison & 0x00FF) == 0);
+                        P.Set(StatusRegister.N, (comparison & 0x0080) == 0);
+                        _opCodeInProgress = false;
+                        break;
+                }
+            }
         }
+
 
         /// <summary>
         /// Compare Memory and Index X
@@ -667,13 +735,21 @@ namespace Poly6502
         ///
         /// 3 cycles
         /// </summary>
-        public void JMP(AddressingMode addressMode)
+        public void JMP(AddressingMode mode)
         {
-            if (!_opCodeInProgress)
+            BeginOpCode();
+
+            if (_addressingModeInProgress)
             {
-                _opCodeInProgress = true;
-                
+                _addressingMethodLookup[mode]();
             }
+
+            if (_addressingModeInProgress) return;
+
+            AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
+            PC = AddressBusAddress;
+            OutputAddressToPins(AddressBusAddress);
+            _opCodeInProgress = false;
         }
 
         /// <summary>
@@ -694,8 +770,20 @@ namespace Poly6502
         /// <summary>
         /// Load Index X with Memory
         /// </summary>
-        public void LDX()
+        public void LDX(AddressingMode mode)
         {
+            BeginOpCode();
+
+            if (_addressingModeInProgress)
+            {
+                _addressingMethodLookup[mode]();
+            }
+
+            if (_addressingModeInProgress) return;
+
+            X = DataBusData;
+            _opCodeInProgress = false;
+            AddressBusAddress++;
         }
 
         /// <summary>
@@ -724,39 +812,15 @@ namespace Poly6502
         /// </summary>
         public void ORA(AddressingMode mode)
         {
-            if (!_opCodeInProgress)
-            {
-                _opCodeInProgress = true;
-                _addressingModeInProgress = true;
-                _instructionCycles = 2;
-
-                switch (mode)
-                {
-                    case AddressingMode.Indirect:
-                        _addressingModeCycles = 5;
-                        break;
-                    case AddressingMode.ZeroPage:
-                        _addressingModeCycles = 2;
-                        break;
-                }
-
-            }
+            BeginOpCode();
 
             if (_addressingModeInProgress)
             {
-                switch (mode)
-                {
-                    case AddressingMode.Indirect:
-                        IND();
-                        break;
-                    case AddressingMode.ZeroPage:
-                        ZPA();
-                        break;
-                }
+                _addressingMethodLookup[mode]();
             }
             else
             {
-                var data = _dataBusData;
+                var data = OpCodeData;
                 A = (byte) (A | data);
 
                 if (A == 0x00)
@@ -772,8 +836,7 @@ namespace Poly6502
                 _opCodeInProgress = false;
             }
         }
-        
-    
+
 
         /// <summary>
         /// Push Accumulator on Stack
@@ -789,34 +852,30 @@ namespace Poly6502
         /// </summary>
         public void PHP()
         {
-            if (!_opCodeInProgress)
-            {
-                _opCodeInProgress = true;
-                _instructionCycles = 2;
-            }
+            BeginOpCode();
 
             switch (_instructionCycles)
             {
-                case 2:
+                case 0:
                 {
-                    _cpuRead = false;
+                    CpuRead = false;
                     UpdateRw();
-                    _addressBusAddress = (ushort) (0x0100 + SP);
-                    _dataBusData = (byte) P.Set(StatusRegister.B, true);
-                    OutputAddressToPins();
+                    AddressBusAddress = (ushort) (0x0100 + SP);
+                    DataBusData = (byte) P.Set(StatusRegister.B, true);
+                    OutputAddressToPins(AddressBusAddress);
                     SP--;
                     break;
                 }
                 case 1:
                 {
-                    _cpuRead = true;
+                    CpuRead = true;
                     UpdateRw();
                     _opCodeInProgress = false;
                     break;
                 }
             }
 
-            _instructionCycles--;
+            _instructionCycles++;
         }
 
         /// <summary>
@@ -892,15 +951,42 @@ namespace Poly6502
         /// <summary>
         /// Store Accumulator in Memory
         /// </summary>
-        public void STA()
+        public void STA(AddressingMode mode)
         {
+            BeginOpCode();
+
+            if (_addressingModeInProgress)
+            {
+                _addressingMethodLookup[mode]();
+            }
+            else
+            {
+                CpuRead = false;
+                UpdateRw();
+                DataBusData = A;
+                OutputDataToDatabus();
+                _opCodeInProgress = false;
+            }
         }
 
         /// <summary>
         /// Store Index X in Memory
         /// </summary>
-        public void STX()
+        public void STX(AddressingMode mode)
         {
+            BeginOpCode();
+
+            if (_addressingModeInProgress)
+                _addressingMethodLookup[mode]();
+            
+            if(_addressingModeInProgress) return;
+            
+            CpuRead = false;
+            UpdateRw();
+            OutputAddressToPins(OpCodeData);
+            DataBusData = X;
+            OutputDataToDatabus();
+            _opCodeInProgress = false;
         }
 
         /// <summary>
@@ -949,6 +1035,10 @@ namespace Poly6502
         /// Transfer Index Y to Accumulator
         /// </summary>
         public void TYA()
+        {
+        }
+
+        public void SLO(AddressingMode mode)
         {
         }
 
@@ -1048,7 +1138,7 @@ namespace Poly6502
         }
 
         /// <summary>
-        /// Pin 34
+        /// Pin 34OpCode
         ///
         /// <remarks>
         /// 0 = Write
@@ -1057,7 +1147,7 @@ namespace Poly6502
         /// </summary>
         public void RW(float inputVoltage)
         {
-            _cpuRead = inputVoltage >= 3.1;
+            CpuRead = inputVoltage >= 3.1;
         }
 
         /// <summary>
@@ -1088,22 +1178,25 @@ namespace Poly6502
         /// </summary>
         public override void Clock()
         {
+            CpuRead = true;
+            UpdateRw();
+            
+            OutputAddressToPins(AddressBusAddress);
+
             if (!_opCodeInProgress)
             {
-                Pc++;
+                PC = AddressBusAddress;
             }
-            
+
             //Set the unused Flag
-            P |= StatusRegister.Reserved;
+            P.Set(StatusRegister.Reserved, true);
 
             Fetch();
             Execute();
-            
-            OutputAddressToPins();
-            
-            if (!_cpuRead) //Write any data required to the address bus
+
+            if (!CpuRead) //Write any data required to the address bus
             {
-                OutputDataBus();
+                OutputDataToDatabus();
             }
         }
 
@@ -1127,49 +1220,35 @@ namespace Poly6502
         /// </summary>
         public void RES()
         {
-            _cpuRead = true;
-            Pc = 0xFFFC;
-            SP = 0xFD;
             //On a reset, the cpu will look at
             //memory location 0xFFFC for an opcode to run
             //this will take two cycles
-            //one for the lo byte, one for the hi byte.
-            _addressBusAddress = 0xFFFC;
-            _pcFetchComplete = false;
+            //one for the lo byte, one for the hi byte.            
+            SP = 0xFD;
+
+            AddressBusAddress = 0xC000;
+            PC = 0xBFFF;
             _instructionCycles = 2;
+            _pcCurrentFetchCycle = 2;
+            _indirectAddress = 0;
+            _addressingModeCycles = 0;
+            _addressingModeInProgress = false;
+            _pcFetchComplete = false;
+            CpuRead = true;
+            P = StatusRegister.Reserved;
+
 
             //output the address to the address bus
             //so that, on the next cycle, data can be picked up
             //outputted from ram/rom
-            OutputAddressToPins();
+            OutputAddressToPins(AddressBusAddress);
             UpdateRw();
         }
 
         private void Fetch()
         {
-            //we must decode the opcode by fetching
-            //the data at pc and pc+1 which gives us our 16 bit address
-            //this takes 2 cycles.
-
-            if (_pcCurrentFetchCycle == 2 && !_pcFetchComplete) // our first cycle is the lo byte
-            {
-                _instructionLoByte = _dataBusData;
-                _pcCurrentFetchCycle--;
-            }
-
-            if (_pcCurrentFetchCycle == 1 && !_pcFetchComplete) // our second cycle is the hi byte
-            {
-                _instructionHiByte = _dataBusData;
-                //We can construct our program counter with this data now.
-                //the 6502 is little endian, so we need to swap the 
-                //bytes around.
-                Pc = (ushort) (_instructionHiByte << 8 | _instructionLoByte);
-                _pcFetchComplete = true;
-                _pcCurrentFetchCycle--;
-            }
-
-            if (_pcFetchComplete && !_opCodeInProgress)
-                _opCode = _dataBusData;
+            if (!_opCodeInProgress)
+                OpCode = DataBusData;
         }
 
         private void DecodePc()
@@ -1179,10 +1258,7 @@ namespace Poly6502
 
         private void Execute()
         {
-            if (!_pcFetchComplete) //the program has not finished getting the pc
-                return;
-
-            switch (_opCode)
+            switch (OpCode)
             {
                 case 0x00: //BRK 5 cycles
                 {
@@ -1200,14 +1276,53 @@ namespace Poly6502
                 case 0x06:
                     ASL(AddressingMode.ZeroPage);
                     break;
-                case 0x08:
+                case 0x07: //Illegal Opcode
+                    SLO(AddressingMode.ZeroPage);
+                    break;
+                case 0x08: //PHP Implied
                     PHP();
                     break;
-
+                case 0x09: //ORA, Immediate
+                    ORA(AddressingMode.Immediate);
+                    break;
+                case 0x0A: //ASL Accumulator
+                    ASL(AddressingMode.Accumulator);
+                    break;
+                case 0x0D: //ORA Absolute
+                    ORA(AddressingMode.Absolute);
+                    break;
+                case 0xC5: //CMP ZP
+                    CMP(AddressingMode.ZeroPage);
+                    break;
+                case 0xF5: //SBC ZeroPage X:
+                    CMP(AddressingMode.ZeroPageX);
+                    break;
+                case 0x85:
+                    STA(AddressingMode.ZeroPage);
+                    break;
+                case 0x4C:
+                    JMP(AddressingMode.Absolute);
+                    break;
+                case 0xA2:
+                    LDX(AddressingMode.Immediate);
+                    break;
+                case 0x86:
+                    STX(AddressingMode.ZeroPage);
+                    break;
             }
         }
 
-        private void OutputAddressToPins()
+        private void BeginOpCode()
+        {
+            if (!_opCodeInProgress)
+            {
+                _opCodeInProgress = true;
+                _addressingModeInProgress = true;
+                _addressingModeCycles = 0;
+            }
+        }
+
+        private void OutputAddressToPins(ushort address)
         {
             //Address bus is uni directional.
             //Tell everything connected to the address bus the address
@@ -1216,19 +1331,9 @@ namespace Poly6502
                 for (var i = 0; i < device.AddressBusLines.Count; i++)
                 {
                     var pw = Math.Pow(2, i);
-                    var data = ((_addressBusAddress & (ushort) pw) >> i);
+                    var data = ((address & (ushort) pw) >> i);
                     device.AddressBusLines[i](data);
                 }
-            }
-        }
-
-        private void OutputDataBus()
-        {
-            for (int i = 0; i < DataBusLines.Count; i++)
-            {
-                var pw = Math.Pow(2, i);
-                var data = ((_dataBusData & (byte) pw) >> i);
-                DataBusLines[i](data);
             }
         }
 
@@ -1236,7 +1341,7 @@ namespace Poly6502
         {
             foreach (var busDevices in _dataCompatibleDevices)
             {
-                busDevices.SetRW(_cpuRead);
+                busDevices.SetRW(CpuRead);
             }
         }
 

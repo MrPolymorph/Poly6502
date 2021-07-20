@@ -1,8 +1,8 @@
-namespace Poly6502
+namespace Poly6502.Microprocessor
 {
     public enum AddressingMode
     {
-        Implied,
+        Implicit,
         Accumulator,
         Immediate,
         ZeroPage,

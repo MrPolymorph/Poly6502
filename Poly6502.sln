@@ -6,9 +6,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Utilities", "Poly6
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Interfaces", "Poly6502.Interfaces\Poly6502.Interfaces.csproj", "{15984C20-4A59-4570-A0BF-A1D259589889}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502", "Poly6502\Poly6502.csproj", "{7DC6B14E-04F2-4DBA-9F5F-11A6A89EE724}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Microprocessor", "Poly6502.Microprocessor\Poly6502.Microprocessor.csproj", "{7DC6B14E-04F2-4DBA-9F5F-11A6A89EE724}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.CLI", "Poly6502.CLI\Poly6502.CLI.csproj", "{7D079E37-C456-4A8E-BD8B-A86540D9A925}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Tests", "Poly6502.Tests\Poly6502.Tests.csproj", "{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,5 +38,9 @@ Global
 		{7D079E37-C456-4A8E-BD8B-A86540D9A925}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7D079E37-C456-4A8E-BD8B-A86540D9A925}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7D079E37-C456-4A8E-BD8B-A86540D9A925}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

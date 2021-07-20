@@ -7,21 +7,25 @@ namespace Poly6502.Utilities
 {
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
+        private bool _overrideOutput;
+        
         public Dictionary<int, Action<float>> AddressBusLines { get; set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
 
         protected IList<IAddressBusCompatible> _addressCompatibleDevices;
         protected IList<IDataBusCompatible> _dataCompatibleDevices;
 
-        protected byte _dataBusData;
-        protected bool _cpuRead;
-        protected ushort _addressBusAddress;
+        public byte DataBusData { get; protected set; }
+        public bool CpuRead { get; protected set; }
+        public ushort AddressBusAddress { get; protected set; }
 
         public AbstractAddressDataBus()
         {
+            CpuRead = true;
             DataBusLines = new Dictionary<int, Action<float>>();
             AddressBusLines = new Dictionary<int, Action<float>>();
 
+            _overrideOutput = false;
             _addressCompatibleDevices = new List<IAddressBusCompatible>();
             _dataCompatibleDevices = new Collection<IDataBusCompatible>();
             
@@ -32,9 +36,9 @@ namespace Poly6502.Utilities
                 DataBusLines.Add(i, (inputVoltage) =>
                 {
                     if (inputVoltage > 0)
-                        _dataBusData |= (byte) (1 << i1);
+                        DataBusData |= (byte) (1 << i1);
                     else
-                        _dataBusData &= (byte) ~(1 << i1);
+                        DataBusData &= (byte) ~(1 << i1);
                 });
             }
 
@@ -46,26 +50,89 @@ namespace Poly6502.Utilities
                 AddressBusLines.Add(i, (inputVoltage) =>
                 {
                     if (inputVoltage > 0)
-                        _addressBusAddress |= (ushort) (1 << i1);
+                        AddressBusAddress |= (ushort) (1 << i1);
                     else
-                        _addressBusAddress &= (ushort) ~(1 << i1);
+                        AddressBusAddress &= (ushort) ~(1 << i1);
+                    
+                    if(i1 == 15)
+                        OutputDataToDatabus();
                 });
             }
         }
 
-        public void RegisterDataCompatibleDevice(IDataBusCompatible device)
+        public void RegisterDevice(AbstractAddressDataBus device)
+        {
+            var deviceAlreadyAdded = false;
+
+            if (!_addressCompatibleDevices.Contains(device))
+                _addressCompatibleDevices.Add(device);
+            else
+                deviceAlreadyAdded = true;
+
+            if (!_dataCompatibleDevices.Contains(device))
+                _dataCompatibleDevices.Add(device);
+            else
+                deviceAlreadyAdded = true;
+            
+            if(!deviceAlreadyAdded)
+                device.RegisterDevice(this);
+        }
+        
+        public void RegisterDevice(IDataBusCompatible device)
         {
             _dataCompatibleDevices.Add(device);
+            
+            //check if the device is address bus compatible also
+            if (device is IAddressBusCompatible)
+            {
+                if(!_addressCompatibleDevices.Contains((IAddressBusCompatible) device))
+                    _addressCompatibleDevices.Add((IAddressBusCompatible) device);
+            }
+            
         }
-
-        public abstract void SetRW(bool rw);
-
-
-        public void RegisterAddressCompatibleDevice(IAddressBusCompatible device)
+        
+        public void RegisterDevice(IAddressBusCompatible device)
         {
             _addressCompatibleDevices.Add(device);
+            
+            if (device is IDataBusCompatible)
+            {
+                if(!_dataCompatibleDevices.Contains((IDataBusCompatible) device))
+                    _dataCompatibleDevices.Add((IDataBusCompatible) device);
+            }
+        }
+
+        public void PropagationOverride(bool ovr, object invoker)
+        {
+            if (invoker != this)
+                _overrideOutput = ovr;
+        }
+
+        protected virtual void OutputDataToDatabus()
+        {
+            if (!_overrideOutput)
+            {
+                foreach (var device in _dataCompatibleDevices)
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        ushort pw = (ushort) Math.Pow(2, i);
+                        var bit = (ushort) (DataBusData & pw) >> i;
+                        device.DataBusLines[i](bit);
+                    }
+                }
+            }
+        }
+
+        protected void SetPropagation(bool propagate)
+        {
+            foreach (var device in _dataCompatibleDevices)
+            {
+                device.PropagationOverride(propagate, this);
+            }
         }
 
         public abstract void Clock();
+        public abstract void SetRW(bool rw);
     }
 }

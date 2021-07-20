@@ -28,7 +28,7 @@ namespace Poly6502.Utilities
             }
         }
         
-        public void RegisterAddressCompatibleDevice(IAddressBusCompatible device)
+        public void RegisterDevice(IAddressBusCompatible device)
         {
             _addressCompatibleDevices.Add(device);
         }

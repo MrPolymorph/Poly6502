@@ -1,5 +1,4 @@
-﻿using System;
-using Poly6502.Utilities;
+﻿using Poly6502.Utilities;
 
 namespace Poly6502.Ram
 {
@@ -7,48 +6,51 @@ namespace Poly6502.Ram
     {
         private byte[] _ram;
 
+        public byte this[int i]
+        {
+            get { return _ram[i];}
+            set { _ram[i] = value; }
+        }
+
         public Ram(int size)
         {
-            _ram = new byte[0xFFFF];
+            _ram = new byte[size];
 
-             _ram[0xFFFC] = 0x05;
-             _ram[0xFFFD] = 0xFC;
-             _ram[0x0505] = 0xAA;
+            for (int i = 0; i < size; i++)
+            {
+                _ram[i] = 0;
+            }
         }
 
         public override void SetRW(bool rw)
         {
-            _cpuRead = rw;
+            CpuRead = rw;
+        }
 
-            if (_cpuRead)
+        private void Write()
+        {
+            //check if the address is meant for us?
+            if(AddressBusAddress < _ram.Length)
+            {
+                _ram[AddressBusAddress] = DataBusData;
+            }
+        }
+
+        private void Read()
+        {
+            if (AddressBusAddress <= _ram.Length)
+            {
+                DataBusData = _ram[AddressBusAddress & 0x07FF];
                 OutputDataToDatabus();
+            }
         }
 
         public override void Clock()
         {
-            if(_cpuRead)
-                OutputDataToDatabus();
+            if(CpuRead)
+                Read();
             else //read any data into ram
-            {
-                _ram[_addressBusAddress] = _dataBusData;
-            }
+                Write();
         }
-
-        private void OutputDataToDatabus()
-        {
-            var data = _ram[_addressBusAddress];
-
-            foreach(var device in _dataCompatibleDevices)
-            {
-                for (int i = 0; i < 8; i++)
-                {
-                    ushort pw = (ushort)Math.Pow(2, i);
-                    var bit = (ushort)(data & pw) >> i;
-                    device.DataBusLines[i](bit);
-                }
-            }
-        }
-        
-        
     }
 }

@@ -7,7 +7,7 @@ namespace Poly6502.Interfaces
     {
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
         
-        void RegisterDataCompatibleDevice(IDataBusCompatible device);
+        void RegisterDevice(IDataBusCompatible device);
 
         /// <summary>
         /// Set the read / write signal
@@ -17,5 +17,7 @@ namespace Poly6502.Interfaces
         /// </summary>
         /// <param name="rw"></param>
         void SetRW(bool rw);
+
+        void PropagationOverride(bool ovr, object invoker);
     }
 }

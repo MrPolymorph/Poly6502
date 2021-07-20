@@ -1,6 +1,6 @@
 using System;
 
-namespace Poly6502.Flags
+namespace Poly6502.Microprocessor.Flags
 {
     [Flags]
     public enum StatusRegister
