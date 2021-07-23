@@ -52,5 +52,10 @@ namespace Poly6502.Ram
             else //read any data into ram
                 Write();
         }
+
+        public override byte DirectRead(ushort address)
+        {
+            return AddressBusAddress <= _ram.Length ? _ram[AddressBusAddress & 0x07FF] : (byte) 0;
+        }
     }
 }

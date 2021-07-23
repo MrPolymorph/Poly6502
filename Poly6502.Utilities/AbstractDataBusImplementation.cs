@@ -46,5 +46,6 @@ namespace Poly6502.Utilities
         }
 
         public abstract void Clock();
+        public abstract byte DirectRead(ushort address);
     }
 }

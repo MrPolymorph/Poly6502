@@ -33,10 +33,11 @@ namespace Poly6502.CLI
 
         private void ClockTheCPU()
         {
-            OutputToConsole();
-            
             if (_executionTimes < 1_000_000)
             {
+                if(!_mos6502.OpCodeInProgress)
+                    OutputToConsole();
+                
                 Console.Read();
                 
                 //Clock the CPU
@@ -88,10 +89,15 @@ namespace Poly6502.CLI
 
         private void OutputToConsole()
         {
-            Console.WriteLine($"PC:{_mos6502.PC:X4} ADDR:{_mos6502.AddressBusAddress:X4} {_mos6502.OpCode:X2} {_mos6502.InstructionLoByte:X2} {_mos6502.InstructionHiByte:X2} A:{_mos6502.A:X2} X:{_mos6502.X:X2} Y:{_mos6502.Y:X2} P:{(int)_mos6502.P} SP:{_mos6502.SP:X4}");
+            var op =  _mos6502.OpCodeLookupTable[_mos6502.OpCode];
             
-            Console.WriteLine($"0x02 : 0x{_ram[0x02]:X2}");
-            Console.WriteLine($"0x03 : 0x{_ram[0x03]:X2}");
+            
+            Console.WriteLine($" {_mos6502.OpCode:X2} {_mos6502.InstructionLoByte:X2} {_mos6502.InstructionHiByte:X2} {op.OpCodeMethod.Method.Name} ${(_mos6502.InstructionHiByte << 8 | _mos6502.InstructionLoByte):X4} A:{_mos6502.A:X2} X:{_mos6502.X:X2} Y:{_mos6502.Y:X2} P:{(int)_mos6502.P} SP:{_mos6502.SP:X4}");
+        }
+        
+        public override byte DirectRead(ushort address)
+        {
+            throw new NotImplementedException();
         }
     }
 }

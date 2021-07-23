@@ -100,6 +100,20 @@ namespace Poly6502.CLI
                 ProgramMemory[address] = DataBusData;
             }
         }
+        
+        public override byte DirectRead(ushort address)
+        {
+            //check mapper read
+            if(AddressBusAddress >= 0x8000 && AddressBusAddress <= 0xFFFF)
+            {
+                var mappedAddress = AddressBusAddress & (ProgramBanks > 1 ? 0x7FFF : 0x3FFF);
+                SetPropagation(true);
+                return ProgramMemory[mappedAddress];
+                
+            }
+            SetPropagation(false);
+            return 0;
+        }
     }
 
     [StructLayout(LayoutKind.Explicit)]

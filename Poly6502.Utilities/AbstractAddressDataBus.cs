@@ -134,5 +134,6 @@ namespace Poly6502.Utilities
 
         public abstract void Clock();
         public abstract void SetRW(bool rw);
+        public abstract byte DirectRead(ushort address);
     }
 }

@@ -19,5 +19,6 @@ namespace Poly6502.Interfaces
         void SetRW(bool rw);
 
         void PropagationOverride(bool ovr, object invoker);
+        byte DirectRead(ushort address);
     }
 }

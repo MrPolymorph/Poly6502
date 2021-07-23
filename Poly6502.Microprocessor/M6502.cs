@@ -15,13 +15,13 @@ namespace Poly6502.Microprocessor
     {
         private bool _pcFetchComplete;
         private bool _addressingModeInProgress;
-        private bool _opCodeInProgress;
+
         private int _instructionCycles;
         private int _addressingModeCycles;
         private int _pcCurrentFetchCycle;
         private ushort _indirectAddress;
 
-        private Dictionary<AddressingMode, Action> _addressingMethodLookup;
+        public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
 
         /// <summary>
         /// Accumulator
@@ -43,7 +43,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public byte SP { get; private set; }
 
-        
+
         public ushort PC { get; private set; }
 
         public byte InstructionLoByte { get; set; }
@@ -56,25 +56,200 @@ namespace Poly6502.Microprocessor
 
         public byte OpCode { get; private set; }
 
-        public byte OpCodeData { get; private set; }
-
 
         public float InputVoltage { get; private set; }
 
         public ushort AbsoluteAddress { get; private set; }
+        public bool OpCodeInProgress { get; private set; }
 
 
         public M6502()
         {
-            _addressingMethodLookup = new Dictionary<AddressingMode, Action>()
+            OpCodeLookupTable = new Dictionary<byte, Operation>()
             {
-                {AddressingMode.Absolute, ABS},
-                {AddressingMode.Accumulator, ACC},
-                {AddressingMode.ZeroPage, ZPA},
-                {AddressingMode.ZeroPageX, ZPX},
-                {AddressingMode.Indirect, IND},
-                {AddressingMode.Relative, REL},
-                {AddressingMode.Immediate, IMM},
+                /* 0 Row */
+                {0x00, new Operation(BRK, IMP)},
+                {0x01, new Operation(ORA, IND)},
+                {0x05, new Operation(ORA, ZPA)},
+                {0x06, new Operation(ASL, ZPA)},
+                {0x07, new Operation(SLO, ZPA)},
+                {0x08, new Operation(PHP, IMP)},
+                {0x09, new Operation(ORA, IMM)},
+                {0x0A, new Operation(ASL, ACC)},
+                {0x0D, new Operation(ORA, ABS)},
+                {0x0E, new Operation(ASL, ABS)},
+
+                /* 1 Row */
+                {0x10, new Operation(BPL, REL)},
+                {0x11, new Operation(ORA, IND)},
+                {0x15, new Operation(ORA, ZPX)},
+                {0x16, new Operation(ASL, ZPX)},
+                {0x18, new Operation(CLC, IMP)},
+                {0x19, new Operation(ORA, ABS)},
+                {0x1D, new Operation(ORA, ABS)},
+                {0x1E, new Operation(ASL, ABS)},
+
+                /* 2 Row */
+                {0x20, new Operation(JSR, ABS)},
+                {0x21, new Operation(AND, IND)},
+                {0x24, new Operation(BIT, ZPA)},
+                {0x25, new Operation(AND, ZPA)},
+                {0x26, new Operation(ROL, ZPA)},
+                {0x28, new Operation(PLP, IMP)},
+                {0x29, new Operation(AND, IMM)},
+                {0x2A, new Operation(ROL, IMP)},
+                {0x2C, new Operation(BIT, ABS)},
+                {0x2D, new Operation(AND, ABS)},
+                {0x2E, new Operation(ROL, ABS)},
+
+                /* 3 Row */
+                {0x30, new Operation(BMI, REL)},
+                {0x31, new Operation(AND, IND)},
+                {0x35, new Operation(AND, ZPX)},
+                {0x36, new Operation(AND, ZPX)},
+                {0x38, new Operation(SEC, IMP)},
+                {0x39, new Operation(AND, ABS)},
+                {0x3D, new Operation(AND, ABS)},
+                {0x3E, new Operation(ROL, ABS)},
+
+                /* 4 Row */
+                {0x40, new Operation(RTI, IMP)},
+                {0x41, new Operation(EOR, IND)},
+                {0x45, new Operation(EOR, ZPA)},
+                {0x46, new Operation(LSR, ZPA)},
+                {0x48, new Operation(PHA, IMP)},
+                {0x49, new Operation(EOR, IMM)},
+                {0x4A, new Operation(LSR, ACC)},
+                {0x4C, new Operation(JMP, ABS)},
+                {0x4D, new Operation(EOR, ABS)},
+                {0x4E, new Operation(LSR, ABS)},
+
+                /* 5 Row */
+                {0x50, new Operation(BVC, REL)},
+                {0x51, new Operation(EOR, IND)},
+                {0x55, new Operation(EOR, ZPX)},
+                {0x56, new Operation(LSR, ZPX)},
+                {0x58, new Operation(CLI, IMP)},
+                {0x59, new Operation(EOR, ABS)},
+                {0x5D, new Operation(EOR, ABS)},
+                {0x5E, new Operation(LSR, ABS)},
+
+                /* 6 Row */
+                {0x60, new Operation(RTS, IMP)},
+                {0x61, new Operation(ADC, IND)},
+                {0x65, new Operation(ADC, ZPA)},
+                {0x66, new Operation(ROR, ZPA)},
+                {0x68, new Operation(PLA, IMP)},
+                {0x69, new Operation(ADC, IMM)},
+                {0x6A, new Operation(ROR, ACC)},
+                {0x6C, new Operation(JMP, IND)},
+                {0x6D, new Operation(ADC, ABS)},
+                {0x6E, new Operation(ROR, ABS)},
+
+                /* 7 Row */
+                {0x70, new Operation(BVS, REL)},
+                {0x71, new Operation(ADC, IND)},
+                {0x75, new Operation(ADC, ZPX)},
+                {0x76, new Operation(ROR, ZPX)},
+                {0x78, new Operation(SEI, IMP)},
+                {0x79, new Operation(ADC, ABS)},
+                {0x7D, new Operation(ADC, ABS)},
+                {0x7E, new Operation(ROR, ABS)},
+
+                /* 8 Row */
+                {0x81, new Operation(STA, IND)},
+                {0x84, new Operation(STY, ZPA)},
+                {0x85, new Operation(STA, ZPA)},
+                {0x86, new Operation(STX, ZPA)},
+                {0x88, new Operation(DEY, IMP)},
+                {0x8A, new Operation(TXA, IMP)},
+                {0x8C, new Operation(STY, ABS)},
+                {0x8D, new Operation(STA, ABS)},
+                {0x8E, new Operation(STX, ABS)},
+
+                /* 9 Row */
+                {0x90, new Operation(BCC, REL)},
+                {0x91, new Operation(STA, IND)},
+                {0x94, new Operation(STY, ZPX)},
+                {0x95, new Operation(STA, ZPX)},
+                {0x96, new Operation(STX, ZPY)},
+                {0x98, new Operation(TYA, IMP)},
+                {0x99, new Operation(STA, ABS)},
+                {0x9A, new Operation(TXS, ABS)},
+                {0x9D, new Operation(STA, ABS)},
+
+                /* A Row */
+                {0xA0, new Operation(LDY, IMM)},
+                {0xA1, new Operation(LDA, IND)},
+                {0xA2, new Operation(LDX, IMM)},
+                {0xA4, new Operation(LDY, ZPA)},
+                {0xA5, new Operation(LDA, ZPA)},
+                {0xA6, new Operation(LDX, ZPA)},
+                {0xA8, new Operation(TAY, IMP)},
+                {0xA9, new Operation(LDA, IMM)},
+                {0xAA, new Operation(TAX, IMP)},
+                {0xAC, new Operation(LDY, ABS)},
+                {0xAD, new Operation(LDA, ABS)},
+                {0xAE, new Operation(LDX, ABS)},
+
+                /* B Row */
+                {0xB0, new Operation(BCS, REL)},
+                {0xB1, new Operation(LDA, IND)},
+                {0xB4, new Operation(LDY, ZPX)},
+                {0xB5, new Operation(LDA, ZPX)},
+                {0xB6, new Operation(LDX, ZPY)},
+                {0xB8, new Operation(CLV, IMP)},
+                {0xB9, new Operation(LDA, ABS)},
+                {0xBA, new Operation(TSX, IMP)},
+                {0xBC, new Operation(LDY, ABS)},
+                {0xBD, new Operation(LDA, ABS)},
+                {0xBE, new Operation(LDX, ABS)},
+
+                /* C Row */
+                {0xC0, new Operation(CPY, IMM)},
+                {0xC1, new Operation(CMP, IND)},
+                {0xC4, new Operation(CPY, ZPA)},
+                {0xC5, new Operation(CMP, ZPA)},
+                {0xC6, new Operation(DEC, ZPA)},
+                {0xC8, new Operation(INY, IMP)},
+                {0xC9, new Operation(CMP, IMM)},
+                {0xCA, new Operation(DEX, IMP)},
+                {0xCC, new Operation(CPY, ABS)},
+                {0xCD, new Operation(CMP, ABS)},
+                {0xCE, new Operation(DEC, ABS)},
+
+                /* D Row */
+                {0xD0, new Operation(BNE, REL)},
+                {0xD1, new Operation(CMP, IND)},
+                {0xD5, new Operation(CMP, ZPX)},
+                {0xD6, new Operation(DEC, ZPX)},
+                {0xD8, new Operation(CLD, ZPY)},
+                {0xD9, new Operation(CMP, IMP)},
+                {0xDD, new Operation(CMP, ABS)},
+                {0xDE, new Operation(DEC, ABS)},
+
+                /* E Row */
+                {0xE0, new Operation(CPX, IMM)},
+                {0xE1, new Operation(SBC, IND)},
+                {0xE4, new Operation(CPX, ZPA)},
+                {0xE5, new Operation(SBC, ZPA)},
+                {0xE6, new Operation(INC, ZPA)},
+                {0xE8, new Operation(INX, IMP)},
+                {0xE9, new Operation(SBC, IMM)},
+                {0xEA, new Operation(NOP, IMP)},
+                {0xEC, new Operation(CPX, ABS)},
+                {0xED, new Operation(SBC, ABS)},
+                {0xEE, new Operation(INC, ABS)},
+
+                /* F Row */
+                {0xF0, new Operation(BEQ, REL)},
+                {0xF1, new Operation(SBC, IND)},
+                {0xF5, new Operation(SBC, ZPX)},
+                {0xF6, new Operation(INC, ZPX)},
+                {0xF8, new Operation(SED, IMP)},
+                {0xF9, new Operation(SBC, ABS)},
+                {0xFD, new Operation(SBC, ABS)},
+                {0xFE, new Operation(INC, ABS)},
             };
 
             RES();
@@ -102,6 +277,11 @@ namespace Poly6502.Microprocessor
         {
         }
 
+        public void IMP()
+        {
+            _addressingModeInProgress = false;
+        }
+
         /// <summary>
         /// Immediate Addressing
         ///
@@ -118,7 +298,7 @@ namespace Poly6502.Microprocessor
                     OutputAddressToPins(AddressBusAddress);
                     break;
                 case 1:
-                    OpCodeData = DataBusData;
+                    InstructionLoByte = DataBusData;
                     _addressingModeInProgress = false;
                     break;
             }
@@ -137,15 +317,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void ABS()
         {
-            if (!_addressingModeInProgress)
-            {
-                _addressingModeInProgress = true;
-            }
-
             switch (_addressingModeCycles)
             {
                 case 0: //set the address bus to get the lo byte of the address
                 {
+                    _addressingModeInProgress = true;
                     AddressBusAddress++;
                     OutputAddressToPins(AddressBusAddress);
                     break;
@@ -188,7 +364,7 @@ namespace Poly6502.Microprocessor
                     OutputAddressToPins(AddressBusAddress);
                     break;
                 case (1):
-                    OpCodeData = DataBusData &= 0x00FF;
+                    InstructionLoByte = DataBusData &= 0x00FF;
                     _addressingModeInProgress = false;
                     AddressBusAddress++;
                     break;
@@ -223,6 +399,13 @@ namespace Poly6502.Microprocessor
             }
 
             _addressingModeCycles++;
+        }
+
+        public void ZPY()
+        {
+            switch (_addressingModeCycles)
+            {
+            }
         }
 
         /// <summary>
@@ -269,6 +452,19 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void REL()
         {
+            switch (_addressingModeCycles)
+            {
+                case 0:
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
+                    break;
+                case 1:
+                    InstructionLoByte = DataBusData;
+                    _addressingModeInProgress = false;
+                    break;
+            }
+
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -380,11 +576,8 @@ namespace Poly6502.Microprocessor
                  */
                 case 4:
                     AddressBusAddress = (ushort) (AbsoluteAddress | DataBusData);
-                    OutputDataToDatabus();
-                    break;
-                case 5:
-                    OpCodeData = DataBusData;
                     _addressingModeInProgress = false;
+                    OutputDataToDatabus();
                     break;
             }
 
@@ -412,42 +605,31 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Shift left One Bit (Memory or Accumulator)
         /// </summary>
-        public void ASL(AddressingMode mode)
+        public void ASL()
         {
-            BeginOpCode();
+            P = P.Set(StatusRegister.C, (DataBusData & 0xFF00) > 0);
+            P = P.Set(StatusRegister.Z, (DataBusData & 0x00FF) == 0);
+            P = P.Set(StatusRegister.N, (DataBusData & 0x80) == 1);
 
-            if (_addressingModeInProgress)
+            switch (_instructionCycles)
             {
-                _addressingMethodLookup[mode]();
+                case 0:
+                    CpuRead = false;
+                    UpdateRw();
+                    OutputAddressToPins(AddressBusAddress);
+                    DataBusData &= 0x00FF;
+                    break;
+                case 1:
+                    EndOpCode();
+                    break;
             }
-            else
-            {
-                P.Set(StatusRegister.C, (DataBusData & 0xFF00) > 0);
-                P.Set(StatusRegister.Z, (DataBusData & 0x00FF) == 0);
-                P.Set(StatusRegister.N, (DataBusData & 0x80) == 1);
 
-                if (mode == AddressingMode.Implicit)
-                    A = (byte) (DataBusData & 0x00FF);
-                else
-                    _instructionCycles++;
-
-                switch (_instructionCycles)
-                {
-                    case 0:
-                        CpuRead = false;
-                        UpdateRw();
-                        OutputAddressToPins(AddressBusAddress);
-                        DataBusData &= 0x00FF;
-                        break;
-                    case 1:
-                        _opCodeInProgress = false;
-                        CpuRead = true;
-                        UpdateRw();
-                        break;
-                }
-            }
 
             _instructionCycles++;
+        }
+
+        public void ADC()
+        {
         }
 
         /// <summary>
@@ -462,6 +644,19 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BCS()
         {
+            if (P.HasFlag(StatusRegister.C))
+            {
+                AddressBusAddress++;
+                AddressBusAddress += InstructionLoByte;
+                OutputAddressToPins(AddressBusAddress);
+            }
+            else
+            {
+                AddressBusAddress++;
+                
+            }
+            
+            OpCodeInProgress = false;
         }
 
         /// <summary>
@@ -490,8 +685,6 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BNE()
         {
-            BeginOpCode();
-            
             if ((P & StatusRegister.Z) == 0)
             {
                 _instructionCycles++;
@@ -503,6 +696,8 @@ namespace Poly6502.Microprocessor
                     AddressBusAddress = AbsoluteAddress;
                 OutputAddressToPins(AddressBusAddress);
             }
+
+            EndOpCode();
         }
 
         /// <summary>
@@ -535,7 +730,8 @@ namespace Poly6502.Microprocessor
                     DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
                     SP--;
 
-                    P |= StatusRegister.I;
+                    //enable interrupt because we are in a software break.
+                    P = P.Set(StatusRegister.I, true);
                     break;
                 /*
                  * Set the address bus to the address on the stack.
@@ -558,7 +754,7 @@ namespace Poly6502.Microprocessor
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
                     DataBusData = (byte) P;
-                    P |= StatusRegister.B;
+                    P = P.Set(StatusRegister.B, true);
                     SP--;
                     break;
                 /*
@@ -587,8 +783,8 @@ namespace Poly6502.Microprocessor
                  */
                 case (5):
                     AddressBusAddress = (ushort) (DataBusData << 8);
-                    _opCodeInProgress = false;
-                    P &= ~StatusRegister.B;
+                    P = P.Set(StatusRegister.B, false);
+                    EndOpCode();
                     break;
             }
 
@@ -614,7 +810,9 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void CLC()
         {
-            P &= ~StatusRegister.C;
+            P = P.Set(StatusRegister.C, false);
+            AddressBusAddress++;
+            OpCodeInProgress = false;
         }
 
         /// <summary>
@@ -643,26 +841,17 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Compare Memory and Accumulator 
         /// </summary>
-        public void CMP(AddressingMode mode)
+        public void CMP()
         {
-            BeginOpCode();
-
-            if (_addressingModeInProgress)
+            switch (_instructionCycles)
             {
-                _addressingMethodLookup[mode]();
-            }
-            else
-            {
-                switch (_instructionCycles)
-                {
-                    case (0):
-                        var comparison = A - DataBusData;
-                        P.Set(StatusRegister.C, A >= DataBusData);
-                        P.Set(StatusRegister.Z, (comparison & 0x00FF) == 0);
-                        P.Set(StatusRegister.N, (comparison & 0x0080) == 0);
-                        _opCodeInProgress = false;
-                        break;
-                }
+                case (0):
+                    var comparison = A - DataBusData;
+                    P = P.Set(StatusRegister.C, A >= DataBusData);
+                    P = P.Set(StatusRegister.Z, (comparison & 0x00FF) == 0);
+                    P = P.Set(StatusRegister.N, (comparison & 0x0080) == 0);
+                    EndOpCode();
+                    break;
             }
         }
 
@@ -672,6 +861,10 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void CPX()
         {
+            var comparison = X - InstructionLoByte;
+            P = P.Set(StatusRegister.C, X >= InstructionLoByte);
+            P = P.Set(StatusRegister.Z, (comparison & 0x00FF) == 0);
+            P = P.Set(StatusRegister.N, (comparison & 0x0080) == 0);
         }
 
         /// <summary>
@@ -735,21 +928,12 @@ namespace Poly6502.Microprocessor
         ///
         /// 3 cycles
         /// </summary>
-        public void JMP(AddressingMode mode)
+        public void JMP()
         {
-            BeginOpCode();
-
-            if (_addressingModeInProgress)
-            {
-                _addressingMethodLookup[mode]();
-            }
-
-            if (_addressingModeInProgress) return;
-
             AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
             PC = AddressBusAddress;
             OutputAddressToPins(AddressBusAddress);
-            _opCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
@@ -758,6 +942,27 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void JSR()
         {
+            switch (_instructionCycles)
+            {
+                case 0: //store the hi byte
+                    OutputAddressToPins((ushort) (0x0100 + SP));
+                    DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
+                    OutputDataToDatabus();
+                    SP--;
+                    break;
+                case 1: //store the lo byte
+                    OutputAddressToPins((ushort) (0x0100 + SP));
+                    DataBusData = (byte) ((AddressBusAddress & 0x00FF));
+                    SP--;
+                    break;
+                case 2:
+                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
+                    OutputAddressToPins(AddressBusAddress);
+                    OpCodeInProgress = false;
+                    break;
+            }
+
+            _instructionCycles++;
         }
 
         /// <summary>
@@ -770,20 +975,16 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Load Index X with Memory
         /// </summary>
-        public void LDX(AddressingMode mode)
+        public void LDX()
         {
-            BeginOpCode();
-
-            if (_addressingModeInProgress)
-            {
-                _addressingMethodLookup[mode]();
-            }
-
-            if (_addressingModeInProgress) return;
-
             X = DataBusData;
-            _opCodeInProgress = false;
+            OpCodeInProgress = false;
             AddressBusAddress++;
+
+            P = P.Set(StatusRegister.Z, X == 0);
+            P = P.Set(StatusRegister.N, (X & 0x80) == 0);
+
+            EndOpCode();
         }
 
         /// <summary>
@@ -805,36 +1006,22 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void NOP()
         {
+            OpCodeInProgress = false;
+            AddressBusAddress++;
         }
 
         /// <summary>
         /// OR Memory with Accumulator
         /// </summary>
-        public void ORA(AddressingMode mode)
+        public void ORA()
         {
-            BeginOpCode();
+            var data = InstructionLoByte;
+            A = (byte) (A | data);
 
-            if (_addressingModeInProgress)
-            {
-                _addressingMethodLookup[mode]();
-            }
-            else
-            {
-                var data = OpCodeData;
-                A = (byte) (A | data);
+            P = P.Set(StatusRegister.Z, A == 0);
+            P = P.Set(StatusRegister.N, (A & 0x80) == 0);
 
-                if (A == 0x00)
-                    P |= StatusRegister.Z;
-                else
-                    P &= ~StatusRegister.Z;
-
-                if ((A & 0x80) == 1)
-                    P |= StatusRegister.N;
-                else
-                    P &= ~StatusRegister.N;
-
-                _opCodeInProgress = false;
-            }
+            EndOpCode();
         }
 
 
@@ -852,8 +1039,6 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PHP()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case 0:
@@ -868,9 +1053,7 @@ namespace Poly6502.Microprocessor
                 }
                 case 1:
                 {
-                    CpuRead = true;
-                    UpdateRw();
-                    _opCodeInProgress = false;
+                    EndOpCode();
                     break;
                 }
             }
@@ -932,6 +1115,9 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void SEC()
         {
+            P = P.Set(StatusRegister.C, true);
+            AddressBusAddress++;
+            OpCodeInProgress = false;
         }
 
         /// <summary>
@@ -951,42 +1137,27 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Store Accumulator in Memory
         /// </summary>
-        public void STA(AddressingMode mode)
+        public void STA()
         {
-            BeginOpCode();
-
-            if (_addressingModeInProgress)
-            {
-                _addressingMethodLookup[mode]();
-            }
-            else
-            {
-                CpuRead = false;
-                UpdateRw();
-                DataBusData = A;
-                OutputDataToDatabus();
-                _opCodeInProgress = false;
-            }
+            CpuRead = false;
+            UpdateRw();
+            DataBusData = A;
+            OutputDataToDatabus();
+            OpCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
         /// Store Index X in Memory
         /// </summary>
-        public void STX(AddressingMode mode)
+        public void STX()
         {
-            BeginOpCode();
-
-            if (_addressingModeInProgress)
-                _addressingMethodLookup[mode]();
-            
-            if(_addressingModeInProgress) return;
-            
             CpuRead = false;
             UpdateRw();
-            OutputAddressToPins(OpCodeData);
+            OutputAddressToPins(InstructionLoByte);
             DataBusData = X;
             OutputDataToDatabus();
-            _opCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
@@ -1038,7 +1209,7 @@ namespace Poly6502.Microprocessor
         {
         }
 
-        public void SLO(AddressingMode mode)
+        public void SLO()
         {
         }
 
@@ -1180,16 +1351,11 @@ namespace Poly6502.Microprocessor
         {
             CpuRead = true;
             UpdateRw();
-            
+
             OutputAddressToPins(AddressBusAddress);
-
-            if (!_opCodeInProgress)
-            {
-                PC = AddressBusAddress;
-            }
-
+            
             //Set the unused Flag
-            P.Set(StatusRegister.Reserved, true);
+            P = P.Set(StatusRegister.Reserved, true);
 
             Fetch();
             Execute();
@@ -1198,6 +1364,12 @@ namespace Poly6502.Microprocessor
             {
                 OutputDataToDatabus();
             }
+            
+            if (!OpCodeInProgress)
+            {
+                PC = AddressBusAddress;
+            }
+
         }
 
         /// <summary>
@@ -1247,7 +1419,7 @@ namespace Poly6502.Microprocessor
 
         private void Fetch()
         {
-            if (!_opCodeInProgress)
+            if (!OpCodeInProgress)
                 OpCode = DataBusData;
         }
 
@@ -1258,68 +1430,36 @@ namespace Poly6502.Microprocessor
 
         private void Execute()
         {
-            switch (OpCode)
-            {
-                case 0x00: //BRK 5 cycles
-                {
-                    BRK();
-                    break;
-                }
-                case 0x01: // ORA X, Indirect
-                {
-                    ORA(AddressingMode.Indirect);
-                    break;
-                }
-                case 0x05: // ORA, Zero Page
-                    ORA(AddressingMode.ZeroPage);
-                    break;
-                case 0x06:
-                    ASL(AddressingMode.ZeroPage);
-                    break;
-                case 0x07: //Illegal Opcode
-                    SLO(AddressingMode.ZeroPage);
-                    break;
-                case 0x08: //PHP Implied
-                    PHP();
-                    break;
-                case 0x09: //ORA, Immediate
-                    ORA(AddressingMode.Immediate);
-                    break;
-                case 0x0A: //ASL Accumulator
-                    ASL(AddressingMode.Accumulator);
-                    break;
-                case 0x0D: //ORA Absolute
-                    ORA(AddressingMode.Absolute);
-                    break;
-                case 0xC5: //CMP ZP
-                    CMP(AddressingMode.ZeroPage);
-                    break;
-                case 0xF5: //SBC ZeroPage X:
-                    CMP(AddressingMode.ZeroPageX);
-                    break;
-                case 0x85:
-                    STA(AddressingMode.ZeroPage);
-                    break;
-                case 0x4C:
-                    JMP(AddressingMode.Absolute);
-                    break;
-                case 0xA2:
-                    LDX(AddressingMode.Immediate);
-                    break;
-                case 0x86:
-                    STX(AddressingMode.ZeroPage);
-                    break;
-            }
+            var operation = OpCodeLookupTable[OpCode];
+
+            BeginOpCode();
+
+            operation.AddressingModeMethod();
+
+            if (!_addressingModeInProgress)
+                operation.OpCodeMethod();
         }
 
         private void BeginOpCode()
         {
-            if (!_opCodeInProgress)
+            if (!OpCodeInProgress)
             {
-                _opCodeInProgress = true;
+                OpCodeInProgress = true;
                 _addressingModeInProgress = true;
                 _addressingModeCycles = 0;
+                InstructionLoByte = 0;
+                InstructionHiByte = 0;
             }
+        }
+
+        private void EndOpCode()
+        {
+            OpCodeInProgress = false;
+            _addressingModeInProgress = false;
+            _addressingModeCycles = 0;
+            _instructionCycles = 0;
+            CpuRead = true;
+            UpdateRw();
         }
 
         private void OutputAddressToPins(ushort address)
@@ -1343,6 +1483,11 @@ namespace Poly6502.Microprocessor
             {
                 busDevices.SetRW(CpuRead);
             }
+        }
+
+        public override byte DirectRead(ushort address)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion
