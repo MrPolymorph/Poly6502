@@ -12,6 +12,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.CLI", "Poly6502.CL
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Tests", "Poly6502.Tests\Poly6502.Tests.csproj", "{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Visualiser", "Poly6502.Visualiser\Poly6502.Visualiser.csproj", "{F5AF92D6-8718-4316-8590-FD9EFE72E548}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FEB52FF5-29C4-49CA-9F1F-FCF2AB221E8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F5AF92D6-8718-4316-8590-FD9EFE72E548}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F5AF92D6-8718-4316-8590-FD9EFE72E548}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F5AF92D6-8718-4316-8590-FD9EFE72E548}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F5AF92D6-8718-4316-8590-FD9EFE72E548}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

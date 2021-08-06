@@ -48,7 +48,6 @@ namespace Poly6502.CLI
                 _cartridge.Clock();
                 _executionTimes++;
                 
-
             }
             else if (_executionTimes >= 1_000_000 || _stopwatch.Elapsed.Seconds >= 1)
             {

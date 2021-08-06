@@ -695,6 +695,13 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BIT()
         {
+            int temp = (A & DataBusData);
+            SetFlag(StatusRegister.Z, (temp & 0x00FF) == 0);
+            SetFlag(StatusRegister.N, (DataBusData & (1 << 7)) == 0);
+            SetFlag(StatusRegister.V, (DataBusData & (1 << 6)) == 0);
+            
+            OutputAddressToPins(AddressBusAddress);
+            EndOpCode();
         }
 
         /// <summary>
@@ -713,9 +720,10 @@ namespace Poly6502.Microprocessor
             {
                 //crossing page boundary check
                 AddressBusAddress += DataBusData;
-                AddressBusAddress++;
             }
             
+            AddressBusAddress++;
+
             OutputAddressToPins(AddressBusAddress);
 
             EndOpCode();
@@ -817,6 +825,18 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BVC()
         {
+            if ((P & StatusRegister.V) == 0)
+            {
+                AddressBusAddress += DataBusData;
+                AddressBusAddress++;
+            }
+            else
+            {
+                AddressBusAddress++;
+            }
+            
+            OutputAddressToPins(AddressBusAddress);
+            EndOpCode();
         }
 
         /// <summary>
@@ -824,6 +844,14 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BVS()
         {
+            if ((P & StatusRegister.V) != 0)
+            {
+                AddressBusAddress += DataBusData;
+                AddressBusAddress++;
+            }
+            
+            OutputAddressToPins(AddressBusAddress);
+            EndOpCode();
         }
 
         /// <summary>
