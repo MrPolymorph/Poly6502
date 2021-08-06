@@ -86,8 +86,6 @@ namespace Poly6502.CLI
                 DataBusData = ProgramMemory[mappedAddress];
                 SetPropagation(true);
             }
-            
-            SetPropagation(false);
         }
 
         private void Write()

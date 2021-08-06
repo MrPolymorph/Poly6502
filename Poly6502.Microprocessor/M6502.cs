@@ -156,6 +156,7 @@ namespace Poly6502.Microprocessor
                 {0x7E, new Operation(ROR, ABS)},
 
                 /* 8 Row */
+                {0x80, new Operation(STA, IND)},
                 {0x81, new Operation(STA, IND)},
                 {0x84, new Operation(STY, ZPA)},
                 {0x85, new Operation(STA, ZPA)},
@@ -697,8 +698,8 @@ namespace Poly6502.Microprocessor
         {
             int temp = (A & DataBusData);
             SetFlag(StatusRegister.Z, (temp & 0x00FF) == 0);
-            SetFlag(StatusRegister.N, (DataBusData & (1 << 7)) == 0);
-            SetFlag(StatusRegister.V, (DataBusData & (1 << 6)) == 0);
+            SetFlag(StatusRegister.N, (DataBusData & (1 << 7)) != 0);
+            SetFlag(StatusRegister.V, (DataBusData & (1 << 6)) != 0);
             
             OutputAddressToPins(AddressBusAddress);
             EndOpCode();
@@ -828,12 +829,9 @@ namespace Poly6502.Microprocessor
             if ((P & StatusRegister.V) == 0)
             {
                 AddressBusAddress += DataBusData;
-                AddressBusAddress++;
             }
-            else
-            {
-                AddressBusAddress++;
-            }
+            AddressBusAddress++;
+
             
             OutputAddressToPins(AddressBusAddress);
             EndOpCode();
@@ -844,11 +842,12 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BVS()
         {
-            if ((P & StatusRegister.V) != 0)
+            if ((P & StatusRegister.V) == 0)
             {
                 AddressBusAddress += DataBusData;
-                AddressBusAddress++;
             }
+            
+            AddressBusAddress++;
             
             OutputAddressToPins(AddressBusAddress);
             EndOpCode();
@@ -1064,6 +1063,8 @@ namespace Poly6502.Microprocessor
         {
             OpCodeInProgress = false;
             AddressBusAddress++;
+            
+            OutputAddressToPins(AddressBusAddress);
             
             EndOpCode();
         }

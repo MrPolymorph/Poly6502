@@ -206,16 +206,22 @@
         </Button>
 
         
-        <ListBox Grid.Row="2" Grid.Column="10"  Grid.RowSpan="30" Items="{Binding OpCodePassFail}">
+        <ListBox Grid.Row="2" Grid.Column="8" Grid.ColumnSpan="4"  Grid.RowSpan="30" Items="{Binding OpCodePassFail}">
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding Pass}">
-                        <TextBlock.Styles>
-                            <Style Selector="TextBlock">
-                                <Setter Property="Background" Value="{Binding if $self.(test:Attached.Property).Pass then Green else Red}"/>
-                            </Style>
-                        </TextBlock.Styles>
-                    </TextBlock>
+                    <StackPanel Orientation="Vertical">
+                        <TextBlock Text="{Binding Pass}"/>
+                        <TextBlock Text="{Binding Actual.Flags, StringFormat=P: {0}}"/>
+                        <TextBlock Text="{Binding Actual.OpCode, StringFormat=Code: {0}}"/>
+                        <TextBlock Text="{Binding Actual.OpCodeName, StringFormat=Name: {0}}"/>
+                        <TextBlock Text="{Binding Actual.Data1, StringFormat=Lo: {0}}"/>
+                        <TextBlock Text="{Binding Actual.Data2, StringFormat=Hi: {0}}"/>
+                        <TextBlock Text="__________________EXPECTED_____________________"/>
+                        <TextBlock Text="{Binding Expected.OpCode, StringFormat=Code: {0}}"/>
+                        <TextBlock Text="{Binding Expected.OpCodeName, StringFormat=Name: {0}}"/>
+                        <TextBlock Text="{Binding Expected.Data1, StringFormat=Lo: {0}}"/>
+                        <TextBlock Text="{Binding Expected.Data2, StringFormat=Hi: {0}}"/>
+                    </StackPanel>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ListBox>

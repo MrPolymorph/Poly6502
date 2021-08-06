@@ -130,7 +130,8 @@ namespace Poly6502.Visualiser.ViewModels
         private void Verify()
         {
             var item = LogLines[_currentLine];
-
+            item.OpCodeName = _m6502.OpCodeLookupTable[item.OpCode].OpCodeMethod.Method.Name;
+            
             var currentOp = new OpCodeVerification()
             {
                 Expected = item,
@@ -138,7 +139,9 @@ namespace Poly6502.Visualiser.ViewModels
                 {
                     OpCode = _m6502.OpCode,
                     Data1 = _m6502.InstructionLoByte,
-                    Data2 = _m6502.InstructionHiByte
+                    Data2 = _m6502.InstructionHiByte,
+                    OpCodeName = _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name,
+                    Flags =_m6502.P
                 }
             };
 
