@@ -22,7 +22,7 @@ namespace Poly6502.Visualiser.ViewModels
         private Stopwatch _stopwatch;
         private int _executionTimes;
 
-        private byte _ramValue;
+        private string _ramValue;
         private byte _cartValue;
         
         public ICommand ClockCommand { get; }
@@ -36,7 +36,7 @@ namespace Poly6502.Visualiser.ViewModels
         public byte DataBusData => _m6502.DataBusData;
         public string OpCode => _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name;
 
-        public byte RamValue
+        public string RamValue
         {
             get
             {
@@ -130,7 +130,7 @@ namespace Poly6502.Visualiser.ViewModels
         {
             if (_executionTimes < 1_000_000)
             {
-                RamValue = _ram.Peek(_m6502.AddressBusAddress);
+                RamValue = $"{_ram.Peek(2)} : {_ram.Peek(3)}";
                 CartValue = _cartridge.Peek(_m6502.AddressBusAddress);
                 
                 //Clock the CPU
