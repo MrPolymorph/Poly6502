@@ -45,11 +45,10 @@ namespace Poly6502.CLI
                 }
             }
         }
+        
 
         public override void Clock()
         {
-            var mappedAddress = 0;
-
             if (CpuRead)
                 Read();
             else
@@ -86,6 +85,10 @@ namespace Poly6502.CLI
                 DataBusData = ProgramMemory[mappedAddress];
                 SetPropagation(true);
             }
+            else
+            {
+                SetPropagation(false);
+            }
         }
 
         private void Write()
@@ -99,17 +102,15 @@ namespace Poly6502.CLI
             }
         }
         
-        public override byte DirectRead(ushort address)
+
+        public byte Peek(ushort address)
         {
-            //check mapper read
-            if(AddressBusAddress >= 0x8000 && AddressBusAddress <= 0xFFFF)
+            if (address >= 0x8000 && address <= 0xFFFF)
             {
-                var mappedAddress = AddressBusAddress & (ProgramBanks > 1 ? 0x7FFF : 0x3FFF);
-                SetPropagation(true);
+                var mappedAddress = address & (ProgramBanks > 1 ? 0x7FFF : 0x3FFF);
                 return ProgramMemory[mappedAddress];
-                
             }
-            SetPropagation(false);
+
             return 0;
         }
     }

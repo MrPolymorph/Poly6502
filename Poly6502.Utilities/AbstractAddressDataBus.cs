@@ -8,6 +8,7 @@ namespace Poly6502.Utilities
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
         private bool _overrideOutput;
+        private bool _ignorePropagation;
         
         public Dictionary<int, Action<float>> AddressBusLines { get; set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
@@ -26,6 +27,7 @@ namespace Poly6502.Utilities
             AddressBusLines = new Dictionary<int, Action<float>>();
 
             _overrideOutput = false;
+            _ignorePropagation = false;
             _addressCompatibleDevices = new List<IAddressBusCompatible>();
             _dataCompatibleDevices = new Collection<IDataBusCompatible>();
             
@@ -102,9 +104,14 @@ namespace Poly6502.Utilities
             }
         }
 
+        protected void IgnorePropagation(bool ovrd)
+        {
+            _ignorePropagation = ovrd;
+        }
+        
         public void PropagationOverride(bool ovr, object invoker)
         {
-            if (invoker != this)
+            if (invoker != this && !_ignorePropagation)
                 _overrideOutput = ovr;
         }
 
@@ -131,9 +138,9 @@ namespace Poly6502.Utilities
                 device.PropagationOverride(propagate, this);
             }
         }
-
+        
+        
         public abstract void Clock();
         public abstract void SetRW(bool rw);
-        public abstract byte DirectRead(ushort address);
     }
 }

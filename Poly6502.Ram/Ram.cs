@@ -44,6 +44,7 @@ namespace Poly6502.Ram
                 OutputDataToDatabus();
             }
         }
+        
 
         public override void Clock()
         {
@@ -53,9 +54,13 @@ namespace Poly6502.Ram
                 Write();
         }
 
-        public override byte DirectRead(ushort address)
+        public byte Peek(ushort address)
         {
-            return AddressBusAddress <= _ram.Length ? _ram[AddressBusAddress & 0x07FF] : (byte) 0;
+            if (address < _ram.Length)
+                return _ram[address];
+
+            return 0;
         }
+        
     }
 }

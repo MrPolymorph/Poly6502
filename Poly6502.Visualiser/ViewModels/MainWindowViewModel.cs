@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Poly6502.CLI;
@@ -24,6 +22,9 @@ namespace Poly6502.Visualiser.ViewModels
         private Stopwatch _stopwatch;
         private int _executionTimes;
 
+        private byte _ramValue;
+        private byte _cartValue;
+        
         public ICommand ClockCommand { get; }
         public ICommand LoadLogCommand { get; }
         public ICommand RunCommand { get; set; }
@@ -34,7 +35,33 @@ namespace Poly6502.Visualiser.ViewModels
         public ushort AddressBusAddress => _m6502.AddressBusAddress;
         public byte DataBusData => _m6502.DataBusData;
         public string OpCode => _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name;
+
+        public byte RamValue
+        {
+            get
+            {
+                return _ramValue;
+            }
+            set
+            {
+                _ramValue = value;
+                this.RaisePropertyChanged();
+            }
+        }
         
+        public byte CartValue
+        {
+            get
+            {
+                return _cartValue;
+            }
+            set
+            {
+                _cartValue = value;
+                this.RaisePropertyChanged();
+            }
+        }
+
         public float Pin1 => _m6502.InputVoltage;
         public string Pin2 => "";
         public string Pin3 => "";
@@ -103,12 +130,15 @@ namespace Poly6502.Visualiser.ViewModels
         {
             if (_executionTimes < 1_000_000)
             {
+                RamValue = _ram.Peek(_m6502.AddressBusAddress);
+                CartValue = _cartridge.Peek(_m6502.AddressBusAddress);
+                
                 //Clock the CPU
                 _m6502.Clock();
                 
-                //this ordering is important to keep propagation ordering 
-                _ram.Clock();
+                //this ordering is important to keep propagation ordering
                 _cartridge.Clock();
+                _ram.Clock();
                 _executionTimes++;
 
                 if (!_m6502.OpCodeInProgress)

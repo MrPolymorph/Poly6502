@@ -35,6 +35,11 @@ namespace Poly6502.Utilities
             _dataBusCompatiblesDevices.Add(device);
         }
 
+        public void Refresh()
+        {
+            throw new NotImplementedException();
+        }
+
         public void SetRW(bool rw)
         {
             _cpuRead = rw;

@@ -205,6 +205,11 @@
             <TextBlock Text="RUN (Auto Clock)"/>
         </Button>
 
+        <StackPanel Grid.Row="7" Grid.Column="0">
+            <TextBlock Text="{Binding RamValue, StringFormat=RAM: {0:X2}}"/>
+            <TextBlock Text="{Binding CartValue, StringFormat=CART: {0:X2}}"/>
+        </StackPanel>
+        
         
         <ListBox Grid.Row="2" Grid.Column="8" Grid.ColumnSpan="4"  Grid.RowSpan="30" Items="{Binding OpCodePassFail}">
             <ItemsControl.ItemTemplate>

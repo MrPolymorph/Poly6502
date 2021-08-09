@@ -13,7 +13,7 @@ namespace Poly6502.Visualiser.Models
 
         public bool Compare(byte opCode, byte data1, byte data2)
         {
-            return OpCode == opCode && Data1 == data1 && Data2 == data2;
+            return OpCode == opCode;
         }
     }
 }

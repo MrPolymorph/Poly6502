@@ -80,7 +80,7 @@ namespace Poly6502.CLI
         {
             
         }
-
+        
         public override void Clock()
         {
             throw new NotImplementedException();
@@ -94,9 +94,5 @@ namespace Poly6502.CLI
             Console.WriteLine($"{_mos6502.OpCode:X2} {_mos6502.InstructionLoByte:X2} {_mos6502.InstructionHiByte:X2} {op.OpCodeMethod.Method.Name} ${(_mos6502.InstructionHiByte << 8 | _mos6502.InstructionLoByte):X4} A:{_mos6502.A:X2} X:{_mos6502.X:X2} Y:{_mos6502.Y:X2} P:{(int)_mos6502.P} SP:{_mos6502.SP:X4}");
         }
         
-        public override byte DirectRead(ushort address)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
