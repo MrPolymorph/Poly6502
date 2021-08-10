@@ -140,8 +140,8 @@ namespace Poly6502.Visualiser.ViewModels
                 _cartridge.Clock();
                 _ram.Clock();
                 _executionTimes++;
-
-                if (!_m6502.OpCodeInProgress)
+                
+                if (!_m6502.OpCodeInProgress && !_m6502.AddressingModeInProgress)
                 {
                     Verify();
                     _currentLine++;
@@ -159,25 +159,32 @@ namespace Poly6502.Visualiser.ViewModels
 
         private void Verify()
         {
-            var item = LogLines[_currentLine];
-            item.OpCodeName = _m6502.OpCodeLookupTable[item.OpCode].OpCodeMethod.Method.Name;
-            
-            var currentOp = new OpCodeVerification()
+            try
             {
-                Expected = item,
-                Actual = new LogLine()
-                {
-                    OpCode = _m6502.OpCode,
-                    Data1 = _m6502.InstructionLoByte,
-                    Data2 = _m6502.InstructionHiByte,
-                    OpCodeName = _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name,
-                    Flags =_m6502.P
-                }
-            };
+                var item = LogLines[_currentLine];
+                item.OpCodeName = _m6502.OpCodeLookupTable[item.OpCode].OpCodeMethod.Method.Name;
 
-            currentOp.Pass = item.Compare(_m6502.OpCode, _m6502.InstructionLoByte, _m6502.InstructionHiByte);
-            
-            OpCodePassFail.Add(currentOp);
+                var currentOp = new OpCodeVerification()
+                {
+                    Expected = item,
+                    Actual = new LogLine()
+                    {
+                        OpCode = _m6502.OpCode,
+                        LoByte = _m6502.InstructionLoByte,
+                        HiByte = _m6502.InstructionHiByte,
+                        OpCodeName = _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name,
+                        Flags = _m6502.P,
+                    }
+                };
+
+                currentOp.Pass = item.Compare(_m6502.OpCode, _m6502.InstructionLoByte, _m6502.InstructionHiByte, _m6502.P);
+
+                OpCodePassFail.Add(currentOp);
+            }
+            catch (Exception ex)
+            {
+                
+            }
         }
         
         private void UpdateBindings()

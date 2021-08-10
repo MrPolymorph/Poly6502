@@ -217,15 +217,19 @@
                     <StackPanel Orientation="Vertical">
                         <TextBlock Text="{Binding Pass}"/>
                         <TextBlock Text="{Binding Actual.Flags, StringFormat=P: {0}}"/>
-                        <TextBlock Text="{Binding Actual.OpCode, StringFormat=Code: {0}}"/>
+                        <TextBlock Text="{Binding Actual.Flags, StringFormat=P: 0x{0:X}}"/>
                         <TextBlock Text="{Binding Actual.OpCodeName, StringFormat=Name: {0}}"/>
-                        <TextBlock Text="{Binding Actual.Data1, StringFormat=Lo: {0}}"/>
-                        <TextBlock Text="{Binding Actual.Data2, StringFormat=Hi: {0}}"/>
+                        <TextBlock Text="{Binding Actual.OpCode, StringFormat=Op: {0:X2}}"/>
+                        <TextBlock Text="{Binding Actual.LoByte, StringFormat=Lo: {0:X2}}"/>
+                        <TextBlock Text="{Binding Actual.HiByte, StringFormat=Hi: {0:X2}}"/>
                         <TextBlock Text="__________________EXPECTED_____________________"/>
-                        <TextBlock Text="{Binding Expected.OpCode, StringFormat=Code: {0}}"/>
+                        <TextBlock Text="{Binding Expected.ProgramCounter, StringFormat=PC: {0:X4}}"/>
+                        <TextBlock Text="{Binding Expected.Flags, StringFormat=P: {0}}"/>
+                        <TextBlock Text="{Binding Expected.Flags, StringFormat=P: 0x{0:X}}"/>
                         <TextBlock Text="{Binding Expected.OpCodeName, StringFormat=Name: {0}}"/>
-                        <TextBlock Text="{Binding Expected.Data1, StringFormat=Lo: {0}}"/>
-                        <TextBlock Text="{Binding Expected.Data2, StringFormat=Hi: {0}}"/>
+                        <TextBlock Text="{Binding Expected.OpCode, StringFormat=OP: {0:X2}}"/>
+                        <TextBlock Text="{Binding Expected.LoByte, StringFormat=Lo: {0:X2}}"/>
+                        <TextBlock Text="{Binding Expected.HiByte, StringFormat=Hi: {0:X2}}"/>
                     </StackPanel>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
