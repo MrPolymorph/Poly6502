@@ -105,13 +105,14 @@ namespace Poly6502.CLI
 
         public byte Peek(ushort address)
         {
-            if (address >= 0x8000 && address <= 0xFFFF)
+            byte data = 0;
+            if(address is >= 0x8000 and <= 0xFFFF)
             {
                 var mappedAddress = address & (ProgramBanks > 1 ? 0x7FFF : 0x3FFF);
-                return ProgramMemory[mappedAddress];
+                data = ProgramMemory[mappedAddress];
             }
 
-            return 0;
+            return data;
         }
     }
 

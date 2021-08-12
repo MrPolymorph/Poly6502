@@ -22,7 +22,7 @@ namespace Poly6502.Visualiser.ViewModels
         private Stopwatch _stopwatch;
         private int _executionTimes;
 
-        private string _ramValue;
+        private byte _ramValue;
         private byte _cartValue;
         
         public ICommand ClockCommand { get; }
@@ -36,7 +36,7 @@ namespace Poly6502.Visualiser.ViewModels
         public byte DataBusData => _m6502.DataBusData;
         public string OpCode => _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name;
 
-        public string RamValue
+        public byte RamValue
         {
             get
             {
@@ -130,7 +130,13 @@ namespace Poly6502.Visualiser.ViewModels
         {
             if (_executionTimes < 1_000_000)
             {
-                RamValue = $"{_ram.Peek(2)} : {_ram.Peek(3)}";
+                if (!_m6502.OpCodeInProgress)
+                {
+                    Verify();
+                    _currentLine++;
+                }
+
+                RamValue = _ram.Peek(_m6502.AddressBusAddress);
                 CartValue = _cartridge.Peek(_m6502.AddressBusAddress);
                 
                 //Clock the CPU
@@ -140,13 +146,6 @@ namespace Poly6502.Visualiser.ViewModels
                 _cartridge.Clock();
                 _ram.Clock();
                 _executionTimes++;
-                
-                if (!_m6502.OpCodeInProgress && !_m6502.AddressingModeInProgress)
-                {
-                    Verify();
-                    _currentLine++;
-                }
-
             }
             else if (_executionTimes >= 1_000_000 || _stopwatch.Elapsed.Seconds >= 1)
             {
@@ -164,20 +163,28 @@ namespace Poly6502.Visualiser.ViewModels
                 var item = LogLines[_currentLine];
                 item.OpCodeName = _m6502.OpCodeLookupTable[item.OpCode].OpCodeMethod.Method.Name;
 
+                var currentOpCode = _cartridge.Peek((ushort) (AddressBusAddress));
+                var currentLo = _cartridge.Peek((ushort) (AddressBusAddress +1));
+                var currentHi = _cartridge.Peek((ushort) (AddressBusAddress + 2));
+                
+                var actual = new LogLine()
+                {
+                    OpCode = currentOpCode,
+                    LoByte = currentLo,
+                    HiByte = currentHi,
+                    OpCodeName = _m6502.OpCodeLookupTable[currentOpCode].OpCodeMethod.Method.Name,
+                    ProgramCounter = AddressBusAddress,
+                    Flags = (_m6502.P.Register),
+                    A = _m6502.A
+                };
+
                 var currentOp = new OpCodeVerification()
                 {
                     Expected = item,
-                    Actual = new LogLine()
-                    {
-                        OpCode = _m6502.OpCode,
-                        LoByte = _m6502.InstructionLoByte,
-                        HiByte = _m6502.InstructionHiByte,
-                        OpCodeName = _m6502.OpCodeLookupTable[_m6502.OpCode].OpCodeMethod.Method.Name,
-                        Flags = _m6502.P,
-                    }
+                    Actual = actual
                 };
 
-                currentOp.Pass = item.Compare(_m6502.OpCode, _m6502.InstructionLoByte, _m6502.InstructionHiByte, _m6502.P);
+                currentOp.Pass = item.Compare(actual);
 
                 OpCodePassFail.Add(currentOp);
             }

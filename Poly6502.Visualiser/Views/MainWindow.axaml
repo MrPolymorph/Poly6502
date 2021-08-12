@@ -206,8 +206,8 @@
         </Button>
 
         <StackPanel Grid.Row="7" Grid.Column="0">
-            <TextBlock Text="{Binding RamValue, StringFormat=RAM: {0:X2}}"/>
-            <TextBlock Text="{Binding CartValue, StringFormat=CART: {0:X2}}"/>
+            <TextBlock Text="{Binding RamValue, StringFormat=RAM: {0}}"/>
+            <TextBlock Text="{Binding CartValue, StringFormat=CART: {0}}"/>
         </StackPanel>
         
         
@@ -222,6 +222,7 @@
                         <TextBlock Text="{Binding Actual.OpCode, StringFormat=Op: {0:X2}}"/>
                         <TextBlock Text="{Binding Actual.LoByte, StringFormat=Lo: {0:X2}}"/>
                         <TextBlock Text="{Binding Actual.HiByte, StringFormat=Hi: {0:X2}}"/>
+                        <TextBlock Text="{Binding Actual.A, StringFormat=A: {0:X}}"/>
                         <TextBlock Text="__________________EXPECTED_____________________"/>
                         <TextBlock Text="{Binding Expected.ProgramCounter, StringFormat=PC: {0:X4}}"/>
                         <TextBlock Text="{Binding Expected.Flags, StringFormat=P: {0}}"/>
@@ -230,6 +231,7 @@
                         <TextBlock Text="{Binding Expected.OpCode, StringFormat=OP: {0:X2}}"/>
                         <TextBlock Text="{Binding Expected.LoByte, StringFormat=Lo: {0:X2}}"/>
                         <TextBlock Text="{Binding Expected.HiByte, StringFormat=Hi: {0:X2}}"/>
+                        <TextBlock Text="{Binding Expected.A, StringFormat=A: {0:X}}"/>
                     </StackPanel>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>

@@ -2,8 +2,7 @@ using System;
 
 namespace Poly6502.Microprocessor.Flags
 {
-    [Flags]
-    public enum StatusRegister
+    public class StatusRegister
     {
         /// <summary>
         /// Carry Flag: Enables numbers larger than a single word to be
@@ -16,7 +15,8 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = True
         /// </remarks>
         /// </summary>
-        C = 0x1,
+        private bool C;
+
         /// <summary>
         /// Zero Flag: Indicates that the result of the arithmetic or logical operation
         /// (or, sometimes, a load) was zero.
@@ -25,7 +25,8 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = result zero
         /// </remarks>
         /// </summary>
-        Z = 0x2,
+        private bool Z;
+
         /// <summary>
         /// Interrupt Flag: This bit indicates if interrupts are enabled or masked.
         ///
@@ -33,7 +34,8 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = Disabled
         /// </remarks>
         /// </summary>
-        I = 0x4,
+        private bool I;
+
         /// <summary>
         /// Decimal Flag:
         ///
@@ -41,12 +43,15 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = true
         /// </remarks>
         /// </summary>
-        D = 0x8,
+        private bool D;
+
         /// <summary>
         /// Break Flag:
         /// </summary>
-        B = 0x9,
-        Reserved = 0x24,
+        private bool B;
+
+        private bool Reserved;
+
         /// <summary>
         /// Overflow Flag: Indicates that the signed result of an operation is too large
         /// to fit in the register width using two's compliment representation.
@@ -55,7 +60,8 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = true
         /// </remarks>
         /// </summary>
-        V = 0x40,
+        private bool V;
+
         /// <summary>
         /// Negative Flag: Indicates that the result of a mathematical operation
         /// is negative.
@@ -64,6 +70,174 @@ namespace Poly6502.Microprocessor.Flags
         /// 1 = negative
         /// </remarks>
         /// </summary>
-        N = 0x80,
+        private bool N;
+        
+        public byte Register
+        {
+            get
+            {
+                byte register = 0;
+
+                register |= (byte) (N ? (1 << 7) : (0 << 7));
+                register |= (byte) (V ? (1 << 6) : (0 << 6));
+                register |= (byte) (Reserved ? (1 << 5) : (0 << 5));
+                register |= (byte) (B ? (1 << 4) : (0 << 4));
+                register |= (byte) (D ? (1 << 3) : (0 << 3));
+                register |= (byte) (I ? (1 << 2) : (0 << 2));
+                register |= (byte) (Z ? (1 << 1) : (0 << 1));
+                register |= (byte)(C ? 1 : 0);
+                return register;
+            }
+        }
+
+        public bool HasFlag(StatusRegisterFlags flag)
+        {
+            switch (flag)
+            {
+                case StatusRegisterFlags.C:
+                    return C;
+                    break;
+                case StatusRegisterFlags.Z:
+                    return Z;
+                    break;
+                case StatusRegisterFlags.I:
+                    return I;
+                    break;
+                case StatusRegisterFlags.D:
+                    return D;
+                    break;
+                case StatusRegisterFlags.B:
+                    return B;
+                    break;
+                case StatusRegisterFlags.Reserved:
+                    return Reserved;
+                    break;
+                case StatusRegisterFlags.V:
+                    return V;
+                    break;
+                case StatusRegisterFlags.N:
+                    return N;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(flag), flag, null);
+            }
+        }
+
+        public void SetFlag(byte b)
+        {
+            C = (b & (1 << 0)) != 0;
+            Z = (b & (1 << 1)) != 0;
+            I = (b & (1 << 2)) != 0;
+            D = (b & (1 << 3)) != 0;
+            B = (b & (1 << 4)) != 0;
+            Reserved = (b & (1 << 5)) != 0;
+            V = (b & (1 << 6)) != 0;
+            N = (b & (1 << 7)) != 0;
+        }
+        
+        public void SetFlag(StatusRegisterFlags flag, bool set = true)
+        {
+            switch (flag)
+            {
+                case StatusRegisterFlags.C:
+                    C = set;
+                    break;
+                case StatusRegisterFlags.Z:
+                    Z = set;
+                    break;
+                case StatusRegisterFlags.I:
+                    I = set;
+                    break;
+                case StatusRegisterFlags.D:
+                    D = set;
+                    break;
+                case StatusRegisterFlags.B:
+                    B = set;
+                    break;
+                case StatusRegisterFlags.Reserved:
+                    Reserved = set;
+                    break;
+                case StatusRegisterFlags.V:
+                    V = set;
+                    break;
+                case StatusRegisterFlags.N:
+                    N = set;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(flag), flag, null);
+            }
+        }
+
+    }
+
+    public enum StatusRegisterFlags
+    {
+        /// <summary>
+        /// Carry Flag: Enables numbers larger than a single word to be
+        /// added/subtracted by carrying a binary digit from a less significant
+        /// word to the least significant bit of a more significant word ad needed.
+        ///
+        /// It is also used to extend bit shifts and rotates in a similar manner on many
+        /// processors
+        /// <remarks>
+        /// 1 = True
+        /// </remarks>
+        /// </summary>
+        C,
+
+        /// <summary>
+        /// Zero Flag: Indicates that the result of the arithmetic or logical operation
+        /// (or, sometimes, a load) was zero.
+        ///
+        /// <remarks>
+        /// 1 = result zero
+        /// </remarks>
+        /// </summary>
+        Z,
+
+        /// <summary>
+        /// Interrupt Flag: This bit indicates if interrupts are enabled or masked.
+        ///
+        /// <remarks>
+        /// 1 = Disabled
+        /// </remarks>
+        /// </summary>
+        I,
+
+        /// <summary>
+        /// Decimal Flag:
+        ///
+        /// <remarks>
+        /// 1 = true
+        /// </remarks>
+        /// </summary>
+        D,
+
+        /// <summary>
+        /// Break Flag:
+        /// </summary>
+        B,
+
+        Reserved,
+
+        /// <summary>
+        /// Overflow Flag: Indicates that the signed result of an operation is too large
+        /// to fit in the register width using two's compliment representation.
+        ///
+        /// <remarks>
+        /// 1 = true
+        /// </remarks>
+        /// </summary>
+        V,
+
+        /// <summary>
+        /// Negative Flag: Indicates that the result of a mathematical operation
+        /// is negative.
+        ///
+        ///  <remarks>
+        /// 1 = negative
+        /// </remarks>
+        /// </summary>
+        N,
     }
 }

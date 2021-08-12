@@ -31,8 +31,10 @@ namespace Poly6502.Visualiser
                 byte lo = 0;
                 byte hi = 0;
                 byte p;
+                byte a;
                 byte.TryParse(line.Substring(9, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out lo);
                 byte.TryParse(line.Substring(12, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out hi);
+                byte.TryParse(line.Substring(50, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out a);
                 byte.TryParse(line.Substring(65, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out p);
                 var ll = new LogLine()
                 {
@@ -40,7 +42,8 @@ namespace Poly6502.Visualiser
                     OpCode = byte.Parse(line.Substring(6,2), NumberStyles.HexNumber),
                     LoByte = lo,
                     HiByte = hi,
-                    Flags = (StatusRegister)p
+                    Flags = (byte) (p),
+                    A = a
                 };
                 
                 logLines.Add(ll);

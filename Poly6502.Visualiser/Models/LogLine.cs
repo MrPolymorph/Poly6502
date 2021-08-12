@@ -9,11 +9,18 @@ namespace Poly6502.Visualiser.Models
         public byte LoByte { get; set; }
         public byte HiByte { get; set; }
         public string OpCodeName { get; set; }
-        public StatusRegister Flags { get; set; }
+        public byte Flags { get; set; }
+        public byte A { get; set; }
 
-        public bool Compare(byte opCode, byte data1, byte data2, StatusRegister P)
+        public bool Compare(LogLine log)
         {
-            return OpCode == opCode && data1 == LoByte && data2 == HiByte && P == Flags;
+            return ProgramCounter == log.ProgramCounter &&
+                   OpCode == log.OpCode &&
+                   // LoByte == log.LoByte &&
+                   // HiByte == log.HiByte &&
+                   OpCodeName == log.OpCodeName &&
+                   Flags == log.Flags &&
+                   A == log.A;
         }
     }
 }
