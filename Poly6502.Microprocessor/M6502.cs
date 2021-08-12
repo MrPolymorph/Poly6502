@@ -737,6 +737,16 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BMI()
         {
+            BeginOpCode();
+
+            if (P.HasFlag(StatusRegisterFlags.N))
+            {
+                AddressBusAddress += DataBusData;
+            }
+
+            AddressBusAddress++;
+            
+            EndOpCode();
         }
 
         /// <summary>
@@ -1117,12 +1127,13 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void ORA()
         {
-            var data = InstructionLoByte;
-            A = (byte) (A | data);
+            A = (byte) (A | DataBusData);
 
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
-            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
+            AddressBusAddress++;
+            
             EndOpCode();
         }
 
