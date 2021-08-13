@@ -11,6 +11,8 @@ namespace Poly6502.Visualiser.Models
         public string OpCodeName { get; set; }
         public byte Flags { get; set; }
         public byte A { get; set; }
+        public byte X { get; set; }
+        public byte Y { get; set; }
 
         public bool Compare(LogLine log)
         {
@@ -20,7 +22,9 @@ namespace Poly6502.Visualiser.Models
                    // HiByte == log.HiByte &&
                    OpCodeName == log.OpCodeName &&
                    Flags == log.Flags &&
-                   A == log.A;
+                   A == log.A &&
+                   X == log.X &&
+                   Y == log.Y;
         }
     }
 }

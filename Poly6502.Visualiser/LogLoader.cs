@@ -32,9 +32,13 @@ namespace Poly6502.Visualiser
                 byte hi = 0;
                 byte p;
                 byte a;
+                byte x;
+                byte y;
                 byte.TryParse(line.Substring(9, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out lo);
                 byte.TryParse(line.Substring(12, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out hi);
                 byte.TryParse(line.Substring(50, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out a);
+                byte.TryParse(line.Substring(55, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out x);
+                byte.TryParse(line.Substring(60, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out y);
                 byte.TryParse(line.Substring(65, 2), NumberStyles.HexNumber, CultureInfo.CurrentCulture, out p);
                 var ll = new LogLine()
                 {
