@@ -17,11 +17,10 @@ namespace Poly6502.CLI
         public void LoadProgram()
         {
             Header header;
-            using (var fs = new FileStream("/home/kris/Projects/Poly6502/ROMS/CPU_Tests/nestest.nes", FileMode.Open))
+            using (var fs = new FileStream("/home/kris/Documents/ROMS/nestest.nes", FileMode.Open))
             {
                 using (var br = new BinaryReader(fs))
                 {
-                    byte[] allData = File.ReadAllBytes("/home/kris/Projects/Poly6502/ROMS/CPU_Tests/nestest.nes");
                     byte[] buffer = br.ReadBytes(Marshal.SizeOf(typeof(Header)));
 
                     var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
