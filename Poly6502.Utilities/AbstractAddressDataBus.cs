@@ -19,6 +19,7 @@ namespace Poly6502.Utilities
         public byte DataBusData { get; protected set; }
         public bool CpuRead { get; protected set; }
         public ushort AddressBusAddress { get; protected set; }
+        public ushort RelativeAddress { get; protected set; }
 
         public AbstractAddressDataBus()
         {
