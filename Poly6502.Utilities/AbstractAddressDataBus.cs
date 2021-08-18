@@ -56,9 +56,12 @@ namespace Poly6502.Utilities
                         AddressBusAddress |= (ushort) (1 << i1);
                     else
                         AddressBusAddress &= (ushort) ~(1 << i1);
-                    
-                    if(i1 == 15)
-                        OutputDataToDatabus();
+
+                    if (i1 == 15)
+                    {
+                        Clock();
+                        //OutputDataToDatabus();
+                    }
                 });
             }
         }

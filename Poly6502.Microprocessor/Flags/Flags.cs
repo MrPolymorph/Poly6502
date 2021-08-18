@@ -96,28 +96,20 @@ namespace Poly6502.Microprocessor.Flags
             {
                 case StatusRegisterFlags.C:
                     return C;
-                    break;
                 case StatusRegisterFlags.Z:
                     return Z;
-                    break;
                 case StatusRegisterFlags.I:
                     return I;
-                    break;
                 case StatusRegisterFlags.D:
                     return D;
-                    break;
                 case StatusRegisterFlags.B:
                     return B;
-                    break;
                 case StatusRegisterFlags.Reserved:
                     return Reserved;
-                    break;
                 case StatusRegisterFlags.V:
                     return V;
-                    break;
                 case StatusRegisterFlags.N:
                     return N;
-                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(flag), flag, null);
             }
@@ -168,6 +160,14 @@ namespace Poly6502.Microprocessor.Flags
             }
         }
 
+        public override string ToString()
+        {
+            string output =  $"{(C ? "C | " : string.Empty)} {(Z ? "Z | " : string.Empty)} {(I ? "I | " : string.Empty)}"; 
+                  output +=  $"{(D ? "D | " : string.Empty)} {(B ? "B | " : string.Empty)} {(Reserved ? "Reserved | " : string.Empty)}";
+                  output +=  $"{(V ? "V | " : string.Empty)} {(N ? "N | " : string.Empty)}  0x{Register}";
+
+            return output;
+        }
     }
 
     public enum StatusRegisterFlags
