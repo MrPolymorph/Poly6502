@@ -349,6 +349,52 @@ namespace Poly6502.Microprocessor
                 {0x7B, new Operation(RRA, ABY)},
                 {0x63, new Operation(RRA, IZX)},
                 {0x73, new Operation(RRA, IZY)},
+                
+                /* JAM Illegal Opcodes */
+                {0x02, new Operation(JAM, IMP)},
+                {0x12, new Operation(JAM, IMP)},
+                {0x22, new Operation(JAM, IMP)},
+                {0x32, new Operation(JAM, IMP)},
+                {0x42, new Operation(JAM, IMP)},
+                {0x52, new Operation(JAM, IMP)},
+                {0x62, new Operation(JAM, IMP)},
+                {0x72, new Operation(JAM, IMP)},
+                {0x92, new Operation(JAM, IMP)},
+                {0xB2, new Operation(JAM, IMP)},
+                {0xD2, new Operation(JAM, IMP)},
+                {0xF2, new Operation(JAM, IMP)},
+                
+                /* ANC Illegal Opcodes */
+                {0x0B, new Operation(ANC, IMM)},
+                {0x2B, new Operation(ANC, IMM)},
+                
+                /* ALR Illegal Opcodes */
+                {0x4B, new Operation(ALR, IMM)},
+                
+                /* ARR Illegal Opcodes */
+                {0x6B, new Operation(ARR, IMM)},
+                
+                /* ANE Illegal Opcodes*/
+                {0x8B, new Operation(ANE, IMM)},
+                
+                /* SHA Illegal Opcodes */
+                {0x9F, new Operation(SHA, ABY)},
+                {0x93, new Operation(SHA, IZY)},
+                
+                /* TAS Illegal Opcodes */
+                {0x9B, new Operation(TAS, ABY)},
+                
+                /* SHY Illegal Opcodes */
+                {0x9C, new Operation(SHY, ABX)},
+                
+                /* SHX Illegal Opcodes */
+                {0x9E, new Operation(SHX, ABY)},
+                
+                /* LXA Illegal Opcodes */
+                {0xAB, new Operation(LXA, IMM)},
+                
+                /* LAS Illegal Opcodes */
+                {0xBB, new Operation(LAS, ABY)},
             };
 
             RES();
@@ -728,19 +774,7 @@ namespace Poly6502.Microprocessor
 
             _addressingModeCycles++;
         }
-
-        /// <summary>
-        /// Absolute Indirect
-        ///
-        /// The second byte of the instruction contains the low order eight bits of a memory location.
-        /// The  high order eight bits of that memory location  is contained  in  the third byte of the instruction.
-        /// The contents of the fully specified  memory location  is the low order byte of the effective address.
-        /// The  next memory location contains the high  order byte of the effective address which
-        /// is loaded  into the sixteen  bits of the program counter.
-        /// </summary>
-        public void ABI()
-        {
-        }
+        
 
         /// <summary>
         /// Indirect Addressing
@@ -788,12 +822,108 @@ namespace Poly6502.Microprocessor
         #region Instruction Set
 
         /// <summary>
-        /// Add Memory to Accumulator with carry
+        /// freeze the CPU.
+        /// The processor will be trapped infinitely in
+        /// T1 phase with $FF on the data bus.
+        ///
+        /// call to <see cref="RES"/> required.
         /// </summary>
-        public void ADS()
+        public void JAM()
         {
+            OpCodeInProgress = true;
+            AddressingModeInProgress = false;
         }
 
+        /// <summary>
+        /// Stores A AND X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        public void SHA()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Puts A AND X in SP and stores A AND X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        public void TAS()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// LDA/TSX oper
+        /// </summary>
+        public void LAS()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Store * AND oper in A and X
+
+        /// Highly unstable, involves a 'magic' constant, <see cref="ANE"/>
+        /// </summary>
+        public void LXA()
+        {
+            throw new NotImplementedException();
+        }
+        
+        /// <summary>
+        /// Stores X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        public void SHX()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Stores Y AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        public void SHY()
+        {
+            throw new NotImplementedException();
+        }
+        
+        /// <summary>
+        /// AND operation + set C as ASL
+        /// </summary>
+        public void ANC()
+        {
+            BeginOpCode();
+
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte) (A & DataBusData);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.C, P.HasFlag(StatusRegisterFlags.N));
+                    AddressBusAddress++;
+                    break;
+                }
+                case (2):
+                {
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+        
+        
         /// <summary>
         /// AND Memory with Accumulator
         /// </summary>
@@ -849,6 +979,106 @@ namespace Poly6502.Microprocessor
                         OutputDataToDatabus();
                     }
 
+
+                    AddressBusAddress++;
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// This operation involves the adder:
+        /// V-flag is set according to (A AND oper) + oper
+        /// The carry is not set, but bit 7 (sign) is exchanged with the carry
+        /// </summary>
+        public void ARR()
+        {
+            BeginOpCode();
+
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte) (A & DataBusData);
+
+                    var result = (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0) << 7 | A >> 1;
+
+                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
+                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & (1 << 5)) != 0);
+                    P.SetFlag(StatusRegisterFlags.V, ((DataBusData & (1 << 5)) ^ ((DataBusData & (1 << 4)))) != 0);
+
+                    if (OpCode == 0x6A)
+                        A = (byte) result;
+                    else
+                    {
+                        UpdateRw(false);
+                        DataBusData = (byte) result;
+                        OutputDataToDatabus();
+                    }
+
+                    AddressBusAddress++;
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// * AND X + AND oper
+        /// Highly unstable, do not use.
+        /// A base value in A is determined based on the contents of A and a constant,
+        /// which may be typically $00, $ff, $ee, etc. The value of this constant depends on
+        /// temperature, the chip series, and maybe other factors, as well.
+        /// In order to eliminate these uncertainties from the equation,
+        /// use either 0 as the operand or a value of $FF in the accumulator.
+        /// </summary>
+        public void ANE()
+        {
+            throw new NotImplementedException();
+        }
+        
+        public void ALR()
+        {
+            BeginOpCode();
+
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte) (A & DataBusData);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    AddressBusAddress++;
+                    _instructionCycles++;
+                    break;
+                }
+                case (3):
+                {
+                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
+                    var result = DataBusData >> 1;
+                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+
+                    if (OpCode == 0x4A)
+                        A = (byte) result;
+                    else
+                    {
+                        UpdateRw(false);
+                        DataBusData = (byte) result;
+                        OutputDataToDatabus();
+                    }
 
                     AddressBusAddress++;
                     EndOpCode();
