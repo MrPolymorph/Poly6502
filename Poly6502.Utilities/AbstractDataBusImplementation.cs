@@ -30,11 +30,6 @@ namespace Poly6502.Utilities
             }
         }
         
-        public void RegisterDevice(IDataBusCompatible device)
-        {
-            _dataBusCompatiblesDevices.Add(device);
-        }
-
         public void Refresh()
         {
             throw new NotImplementedException();
@@ -50,7 +45,16 @@ namespace Poly6502.Utilities
             
         }
 
+        public byte Read(ushort address)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Write(ushort address, byte data)
+        {
+            throw new NotImplementedException();
+        }
+
         public abstract void Clock();
-        public abstract byte DirectRead(ushort address);
     }
 }

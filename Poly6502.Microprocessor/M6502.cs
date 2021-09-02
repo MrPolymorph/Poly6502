@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Utilities;
 
@@ -13,13 +12,8 @@ namespace Poly6502.Microprocessor
     /// </summary>
     public class M6502 : AbstractAddressDataBus
     {
-        private bool _pcFetchComplete;
-
-
         private int _instructionCycles;
         private int _addressingModeCycles;
-        private int _pcCurrentFetchCycle;
-        private ushort _indirectAddress;
         private ushort _offset;
 
         public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
@@ -675,7 +669,7 @@ namespace Poly6502.Microprocessor
                 {
                     InstructionHiByte = DataBusData;
                     AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins((ushort) (AddressBusAddress));
+                    OutputAddressToPins(AddressBusAddress);
                     AddressBusAddress = TempAddress;
                     AddressingModeInProgress = false;
                     break;
@@ -850,8 +844,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -1064,8 +1057,7 @@ namespace Poly6502.Microprocessor
                  * decrement stack pointer for next operation
                  */
                 case (0):
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
                     DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
@@ -1103,8 +1095,7 @@ namespace Poly6502.Microprocessor
                  * Set the address bus to address 0xFFFE
                  */
                 case (3):
-                    CpuRead = true;
-                    UpdateRw();
+                    UpdateRw(true);
                     AddressBusAddress = 0xFFFE;
                     OutputAddressToPins(AddressBusAddress);
                     break;
@@ -1313,8 +1304,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
                     
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     DataBusData =  (byte) (data & 0x00FF);
                     OutputDataToDatabus();
 
@@ -1402,9 +1392,8 @@ namespace Poly6502.Microprocessor
                     var data = (DataBusData + 1);
                     P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
-
-                    CpuRead = false;
-                    UpdateRw();
+                    
+                    UpdateRw(false);
                     DataBusData = (byte) (data & 0x00FF);
                     OutputDataToDatabus();
 
@@ -1472,16 +1461,14 @@ namespace Poly6502.Microprocessor
                     break;
                 }
                 case (1): //store the hi byte
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     OutputAddressToPins((ushort) (0x0100 + SP));
                     DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
                     OutputDataToDatabus();
                     SP--;
                     break;
                 case (2): //store the lo byte
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     OutputAddressToPins((ushort) (0x0100 + SP));
                     DataBusData = (byte) ((AddressBusAddress & 0x00FF));
                     SP--;
@@ -1601,8 +1588,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -1665,8 +1651,7 @@ namespace Poly6502.Microprocessor
             switch (_instructionCycles)
             {
                 case (0):
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     OutputAddressToPins((ushort) (SP + 0x0100));
                     DataBusData = A;
                     OutputDataToDatabus();
@@ -1697,8 +1682,7 @@ namespace Poly6502.Microprocessor
                     TempAddress = AddressBusAddress;
                     AddressBusAddress = (ushort) (0x0100 | SP);
                     P.SetFlag(StatusRegisterFlags.B);
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     OutputAddressToPins(AddressBusAddress);
                     DataBusData = P.Register;
                     OutputDataToDatabus();
@@ -1804,8 +1788,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -1844,8 +1827,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -2021,8 +2003,7 @@ namespace Poly6502.Microprocessor
                 }
                 case (1):
                 {
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     DataBusData = A;
                     OutputDataToDatabus();
                     OpCodeInProgress = false;
@@ -2038,8 +2019,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void STX()
         {
-            CpuRead = false;
-            UpdateRw();
+            UpdateRw(false);
             DataBusData = X;
             OutputDataToDatabus();
             AddressBusAddress++;
@@ -2051,8 +2031,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void STY()
         {
-            CpuRead = false;
-            UpdateRw();
+            UpdateRw(false);
             DataBusData = Y;
             OutputDataToDatabus();
             AddressBusAddress++;
@@ -2169,8 +2148,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -2209,8 +2187,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -2246,8 +2223,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -2287,8 +2263,7 @@ namespace Poly6502.Microprocessor
                         A = (byte) result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
+                        UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
@@ -2355,8 +2330,7 @@ namespace Poly6502.Microprocessor
                 case (1):
                 {
                     var temp = (byte)(A & X);
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     DataBusData = temp;
                     OutputDataToDatabus();
                     AddressBusAddress++;
@@ -2383,8 +2357,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
                     
-                    CpuRead = false;
-                    UpdateRw();
+                    UpdateRw(false);
                     DataBusData =  (byte) (data & 0x00FF);
                     OutputDataToDatabus();
 
@@ -2421,9 +2394,8 @@ namespace Poly6502.Microprocessor
                     var data = (DataBusData + 1);
                     P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
-
-                    CpuRead = false;
-                    UpdateRw();
+                    
+                    UpdateRw(false);
                     DataBusData = (byte) (data & 0x00FF);
                     OutputDataToDatabus();
                     
@@ -2573,6 +2545,16 @@ namespace Poly6502.Microprocessor
             throw new NotImplementedException();
         }
 
+        public override byte Read(ushort address)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Write(ushort address, byte data)
+        {
+            throw new NotImplementedException();
+        }
+
 
         /// <summary>
         /// Pin 37
@@ -2583,8 +2565,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public override void Clock()
         {
-            CpuRead = true;
-            UpdateRw();
+            UpdateRw(true);
 
             //Set the unused Flag
             P.SetFlag(StatusRegisterFlags.Reserved);
@@ -2634,11 +2615,8 @@ namespace Poly6502.Microprocessor
             AddressBusAddress = 0xC000;
             PC = 0xBFFF;
             _instructionCycles = 2;
-            _pcCurrentFetchCycle = 2;
-            _indirectAddress = 0;
             _addressingModeCycles = 0;
             AddressingModeInProgress = false;
-            _pcFetchComplete = false;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
@@ -2648,7 +2626,7 @@ namespace Poly6502.Microprocessor
             //so that, on the next cycle, data can be picked up
             //outputted from ram/rom
             OutputAddressToPins(AddressBusAddress);
-            UpdateRw();
+            UpdateRw(true);
         }
 
 
@@ -2702,6 +2680,7 @@ namespace Poly6502.Microprocessor
 
         private void OutputAddressToPins(ushort address)
         {
+#if EMULATE_PIN_OUTPUT
             //Address bus is uni directional.
             //Tell everything connected to the address bus the address
             foreach (var device in _addressCompatibleDevices)
@@ -2713,11 +2692,15 @@ namespace Poly6502.Microprocessor
                     device.AddressBusLines[i](data);
                 }
             }
+#else
+            
+#endif
         }
 
-        private void UpdateRw()
+        private void UpdateRw(bool cpuRead)
         {
-            foreach (var busDevices in _dataCompatibleDevices)
+            CpuRead = cpuRead;
+            foreach (var busDevices in DataCompatibleDevices)
             {
                 busDevices.SetRW(CpuRead);
             }
