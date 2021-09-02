@@ -37,10 +37,9 @@ namespace Poly6502.Microprocessor
         /// Stack Pointer
         /// </summary>
         public byte SP { get; private set; }
-
-
-        public ushort PC { get; private set; }
-
+        
+        public ushort PC { get; set; }
+        
         public byte InstructionLoByte { get; set; }
         public byte InstructionHiByte { get; set; }
 
@@ -49,12 +48,12 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public StatusRegister P { get; private set; }
 
+        public Operation CurrentOperation { get; private set; }
+        
         public byte OpCode { get; private set; }
 
-
         public float InputVoltage { get; private set; }
-
-        public ushort AbsoluteAddress { get; private set; }
+        
         public ushort TempAddress { get; private set; }
         public bool OpCodeInProgress { get; private set; }
         public bool AddressingModeInProgress { get; private set; }
@@ -542,6 +541,16 @@ namespace Poly6502.Microprocessor
             _addressingModeCycles++;
         }
 
+        /// <summary>
+        /// operand is zeropage address; effective address is address incremented by Y without carry
+        ///
+        /// The available 16-bit address space is conceived as consisting of pages of 256 bytes each, with
+        /// address hi-bytes representing the page index. An increment with carry may affect the hi-byte
+        /// and may thus result in a crossing of page boundaries, adding an extra cycle to the execution.
+        /// Increments without carry do not affect the hi-byte of an address and no page transitions do occur.
+        /// Generally, increments of 16-bit addresses include a carry, increments of zeropage addresses don't.
+        /// Notably this is not related in any way to the state of the carry bit of the accumulator.
+        /// </summary>
         public void ZPY()
         {
             switch (_addressingModeCycles)
@@ -2674,7 +2683,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void Ø1()
         {
-            Clock();
+            
         }
 
         /// <summary>
@@ -2795,25 +2804,47 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public override void Clock()
         {
-            UpdateRw(true);
-
             //Set the unused Flag
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
+            
+            if(!OpCodeInProgress)
+                Fetch();
+            
+            if(!AddressingModeInProgress)
+                Execute();
 
-            Console.WriteLine($"P {(byte) P.Register:X2}");
-            Fetch();
-            Execute();
-
-            if (!CpuRead) //Write any data required to the address bus
+        }
+        
+        public void Fetch()
+        {
+            if (!AddressingModeInProgress)
             {
-                OutputDataToDatabus();
+                AddressingModeInProgress = true;
+                
+                foreach (var device in _dataCompatibleDevices)
+                {
+                    if (!device.PropagationOverridden)
+                    {
+                        OpCode = device.Read(AddressBusAddress);
+                    }
+                }
+
+                CurrentOperation = OpCodeLookupTable[OpCode];
             }
 
-            if (!OpCodeInProgress)
-            {
-                PC = AddressBusAddress;
-            }
+            CurrentOperation.AddressingModeMethod();
+        }
+        
+        public void Execute()
+        {
+            if (AddressingModeInProgress) return;
+            
+            OpCodeInProgress = true;
+                
+            BeginOpCode();
+
+            CurrentOperation.OpCodeMethod();
         }
 
         /// <summary>
@@ -2830,6 +2861,21 @@ namespace Poly6502.Microprocessor
         {
         }
 
+        public void ProgramCounterInitialisation()
+        {
+            foreach (var device in _dataCompatibleDevices)
+            {
+                if (!device.PropagationOverridden)
+                {
+                    InstructionLoByte = device.Read(0xFFFC);
+                    InstructionHiByte = device.Read(0xFFFD);
+
+                    PC = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
+                    AddressBusAddress = PC;
+                }
+            }
+        }
+        
         /// <summary>
         /// Pin 40
         /// RESET
@@ -2844,7 +2890,7 @@ namespace Poly6502.Microprocessor
 
             AddressBusAddress = 0xC000;
             PC = 0xBFFF;
-            _instructionCycles = 2;
+            _instructionCycles = 0;
             _addressingModeCycles = 0;
             AddressingModeInProgress = false;
             CpuRead = true;
@@ -2855,36 +2901,11 @@ namespace Poly6502.Microprocessor
             //output the address to the address bus
             //so that, on the next cycle, data can be picked up
             //outputted from ram/rom
-            OutputAddressToPins(AddressBusAddress);
+            ProgramCounterInitialisation();
             UpdateRw(true);
         }
-
-
-        public void Fetch()
-        {
-            if (!OpCodeInProgress)
-            {
-                OutputAddressToPins(AddressBusAddress);
-                OpCode = DataBusData;
-            }
-        }
-
-        private void DecodePc()
-        {
-        }
-
-
-        private void Execute()
-        {
-            var operation = OpCodeLookupTable[OpCode];
-
-            BeginOpCode();
-
-            operation.AddressingModeMethod();
-
-            if (!AddressingModeInProgress)
-                operation.OpCodeMethod();
-        }
+        
+        
 
         private void BeginOpCode()
         {
@@ -2923,14 +2944,20 @@ namespace Poly6502.Microprocessor
                 }
             }
 #else
-            
+            foreach (var device in _dataCompatibleDevices)
+            {
+                if (!device.PropagationOverridden)
+                {
+                    DataBusData = device.Read(AddressBusAddress);
+                }
+            }
 #endif
         }
 
         private void UpdateRw(bool cpuRead)
         {
             CpuRead = cpuRead;
-            foreach (var busDevices in DataCompatibleDevices)
+            foreach (var busDevices in _dataCompatibleDevices)
             {
                 busDevices.SetRW(CpuRead);
             }

@@ -5,9 +5,10 @@ namespace Poly6502.Interfaces
 {
     public interface IDataBusCompatible : IClockable
     {
-        public Dictionary<int, Action<float>> DataBusLines { get; set; }
+        bool PropagationOverridden { get; }
         
-
+        Dictionary<int, Action<float>> DataBusLines { get; set; }
+        
         /// <summary>
         /// Set the read / write signal
         ///

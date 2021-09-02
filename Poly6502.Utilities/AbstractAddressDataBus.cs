@@ -7,16 +7,17 @@ namespace Poly6502.Utilities
 {
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
-        private bool _overrideOutput;
         private bool _ignorePropagation;
-        private readonly IList<IAddressBusCompatible> _addressCompatibleDevices;
-
-        protected readonly IList<IDataBusCompatible> DataCompatibleDevices;
+        
+        protected readonly IList<IAddressBusCompatible> _addressCompatibleDevices;
+        protected readonly IList<IDataBusCompatible> _dataCompatibleDevices;
         protected byte DataBusData { get; set; }
         protected bool CpuRead { get; set; }
         protected ushort AddressBusAddress { get; set; }
         protected ushort RelativeAddress { get; set; }
         public Dictionary<int, Action<float>> AddressBusLines { get; set; }
+        
+        public bool PropagationOverridden { get; private set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
 
 
@@ -25,11 +26,12 @@ namespace Poly6502.Utilities
             CpuRead = true;
             DataBusLines = new Dictionary<int, Action<float>>();
             AddressBusLines = new Dictionary<int, Action<float>>();
-
-            _overrideOutput = false;
+            
             _ignorePropagation = false;
             _addressCompatibleDevices = new List<IAddressBusCompatible>();
-            DataCompatibleDevices = new Collection<IDataBusCompatible>();
+            _dataCompatibleDevices = new Collection<IDataBusCompatible>();
+
+            PropagationOverridden = false;
 
             //setup data lines
             for (int i = 0; i < 8; i++)
@@ -65,10 +67,21 @@ namespace Poly6502.Utilities
         {
             _addressCompatibleDevices.Add(device);
 
-            if (device is IDataBusCompatible)
+            if (device is IDataBusCompatible compatible)
             {
-                if (!DataCompatibleDevices.Contains((IDataBusCompatible) device))
-                    DataCompatibleDevices.Add((IDataBusCompatible) device);
+                if (!_dataCompatibleDevices.Contains(compatible))
+                    _dataCompatibleDevices.Add(compatible);
+            }
+        }
+
+        public void RegisterDevice(IDataBusCompatible device)
+        {
+            _dataCompatibleDevices.Add(device);
+
+            if (device is IAddressBusCompatible compatible)
+            {
+                if (!_addressCompatibleDevices.Contains(compatible))
+                    _addressCompatibleDevices.Add(compatible);
             }
         }
 
@@ -85,15 +98,15 @@ namespace Poly6502.Utilities
         public void PropagationOverride(bool ovr, object invoker)
         {
             if (invoker != this && !_ignorePropagation)
-                _overrideOutput = ovr;
+                PropagationOverridden = ovr;
         }
 
 
         protected virtual void OutputDataToDatabus()
         {
-            if (!_overrideOutput)
+            if (!PropagationOverridden)
             {
-                foreach (var device in DataCompatibleDevices)
+                foreach (var device in _dataCompatibleDevices)
                 {
 #if EMULATE_PIN_OUTPUT
                     for (int i = 0; i < 8; i++)
@@ -114,7 +127,7 @@ namespace Poly6502.Utilities
 
         protected void SetPropagation(bool propagate)
         {
-            foreach (var device in DataCompatibleDevices)
+            foreach (var device in _dataCompatibleDevices)
             {
                 device.PropagationOverride(propagate, this);
             }
