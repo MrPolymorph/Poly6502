@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Utilities;
 
@@ -426,6 +427,11 @@ namespace Poly6502.Microprocessor
             AddressingModeInProgress = false;
         }
 
+        /// <summary>
+        /// Implied Addressing
+        ///
+        /// The data is implied as part of the op
+        /// </summary>
         public void IMP()
         {
             AddressingModeInProgress = false;
@@ -464,7 +470,7 @@ namespace Poly6502.Microprocessor
         {
             switch (_addressingModeCycles)
             {
-                case 0: //set the address bus to get the lo byte of the address
+                case 0: 
                 {
                     AddressingModeInProgress = true;
                     AddressBusAddress++;
@@ -540,7 +546,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// operand is zeropage address; effective address is address incremented by Y without carry
+        /// operand is zero page address; effective address is address incremented by Y without carry
         ///
         /// The available 16-bit address space is conceived as consisting of pages of 256 bytes each, with
         /// address hi-bytes representing the page index. An increment with carry may affect the hi-byte
@@ -787,6 +793,14 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Indirect Addressing
         ///
+        /// This addressing mode reads from the address supplied after the opcode.
+        /// this address is then read from to retrieve the opeand
+        ///
+        /// Cycle 0 - Send out address
+        /// Cycle 1 - Read the lo byte
+        /// Cycle 2 - Read the hi byte / Send combined address (hi sl 8 or lo)
+        /// Cycle 3 - Read new lo byte / page boundary check. Either output the hi byte of the new address or the address +1
+        /// Cycle 4 - Read the new hi byte
         /// </summary>
         public void IND()
         {
@@ -811,11 +825,13 @@ namespace Poly6502.Microprocessor
                     _addressingModeCycles++;
                     break;
                 case 3:
+                    InstructionLoByte = DataBusData;
+                    
                     if (InstructionLoByte == 0x00FF)
                         OutputAddressToPins((ushort) (TempAddress & 0xFF00));
                     else
                         OutputAddressToPins((ushort) (TempAddress + 1));
-                    InstructionLoByte = DataBusData;
+                    
                     _addressingModeCycles++;
                     break;
                 case 4:
@@ -846,7 +862,9 @@ namespace Poly6502.Microprocessor
         /// Stores A AND X AND (high-byte of addr. + 1) at addr.
         /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
         /// (with the high-byte of the value used as the high-byte of the address)
+        ///
         /// </summary>
+        [Unstable]
         public void SHA()
         {
             throw new NotImplementedException();
@@ -857,6 +875,7 @@ namespace Poly6502.Microprocessor
         /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
         /// (with the high-byte of the value used as the high-byte of the address)
         /// </summary>
+        [Unstable]
         public void TAS()
         {
             throw new NotImplementedException();
@@ -874,6 +893,7 @@ namespace Poly6502.Microprocessor
         /// Store * AND oper in A and X
         /// Highly unstable, involves a 'magic' constant, <see cref="ANE"/>
         /// </summary>
+        [HighlyUnstable]
         public void LXA()
         {
             throw new NotImplementedException();
@@ -884,6 +904,7 @@ namespace Poly6502.Microprocessor
         /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
         /// (with the high-byte of the value used as the high-byte of the address)
         /// </summary>
+        [Unstable]
         public void SHX()
         {
             throw new NotImplementedException();
@@ -894,6 +915,7 @@ namespace Poly6502.Microprocessor
         /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
         /// (with the high-byte of the value used as the high-byte of the address)
         /// </summary>
+        [Unstable]
         public void SHY()
         {
             throw new NotImplementedException();
@@ -932,7 +954,47 @@ namespace Poly6502.Microprocessor
 
 
         /// <summary>
-        /// AND Memory with Accumulator
+        /// AND (bitwise AND with accumulator)
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void AND()
         {
@@ -958,7 +1020,40 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Shift left One Bit (Memory or Accumulator)
+        /// ASL (Arithmetic Shift Left)
+        ///
+        /// ASL shifts all the bits left one position. 0 is shifted into bit 0
+        /// and the original bit 7 is shifted into <see cref="StatusRegisterFlags.C"/>
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ASL()
         {
@@ -1038,7 +1133,8 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// * AND X + AND oper
+        /// ANE - AND X + AND oper.
+        /// 
         /// Highly unstable, do not use.
         /// A base value in A is determined based on the contents of A and a constant,
         /// which may be typically $00, $ff, $ee, etc. The value of this constant depends on
@@ -1046,6 +1142,7 @@ namespace Poly6502.Microprocessor
         /// In order to eliminate these uncertainties from the equation,
         /// use either 0 as the operand or a value of $FF in the accumulator.
         /// </summary>
+        [HighlyUnstable]
         public void ANE()
         {
             throw new NotImplementedException();
@@ -1094,6 +1191,58 @@ namespace Poly6502.Microprocessor
             }
         }
 
+        /// <summary>
+        /// ADC (ADd with Carry)
+        /// 
+        /// ADC results are depending on the settings of the <see cref="StatusRegisterFlags.D"/> flag.
+        ///
+        /// In decimal mode, addition is carried out on the assumption that the values involved are packed BCD
+        /// (Binary Coded Decimal).
+        ///
+        /// There is no way to add without carry.
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
+        /// </summary>
         public void ADC()
         {
             switch (_instructionCycles)
@@ -1124,7 +1273,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Carry Clear
+        /// BCC - Branch on Carry Clear
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BCC()
         {
@@ -1140,7 +1296,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Carry Set
+        /// BCS - Branch on Carry Set
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BCS()
         {
@@ -1159,7 +1322,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result Zero
+        /// BEQ - Branch on Result Zero
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BEQ()
         {
@@ -1176,7 +1346,30 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Test Bits in Memory with Accumulator
+        /// BIT (test BITs).
+        ///
+        /// BIT sets the <see cref="StatusRegisterFlags.Z"/> flag as through the value
+        /// in the address tested were <see cref="AND"/> with the accumulator.
+        ///
+        /// The <see cref="StatusRegisterFlags.N"/> and <see cref="StatusRegisterFlags.V"/> flags are
+        /// set to match bits 7 and 6 respectively in the value stored at the tested address.
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BIT()
         {
@@ -1204,7 +1397,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result Minus
+        /// BMI - Branch on Result Minus
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BMI()
         {
@@ -1221,7 +1421,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result not Zero
+        /// BNE - Branch on Result not Zero
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BNE()
         {
@@ -1263,7 +1470,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result Plus
+        /// BPL - Branch on Result Plus
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BPL()
         {
@@ -1279,19 +1493,30 @@ namespace Poly6502.Microprocessor
             EndOpCode();
         }
 
-        /// <summary>
-        /// Force Break
-        /// </summary>
+        /// <Summary>
+        /// BRK (BReaK)
+        ///
+        ///
+        /// BRK causes a non-maskable interrupt and increments the program counter
+        /// by 1.
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.B"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
+        /// 
+        /// </Summary>
         public void BRK()
         {
             switch (_instructionCycles)
             {
-                /*
-                 * Tell everyone we are writing to the data bus
-                 * set the address bus to address on the stack.
-                 * Write the hi byte of the program counter to the data bus
-                 * decrement stack pointer for next operation
-                 */
                 case (0):
                     BeginOpCode();
                     UpdateRw(false);
@@ -1305,12 +1530,6 @@ namespace Poly6502.Microprocessor
 
                     _instructionCycles++;
                     break;
-                /*
-                 * Set the address bus to the address on the stack.
-                 * Write the lo byte of the program counter to the data bus
-                 * decrement the stack pointer for next operation
-                 * 
-                 */
                 case (1):
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
@@ -1319,11 +1538,6 @@ namespace Poly6502.Microprocessor
 
                     _instructionCycles++;
                     break;
-                /*
-                 * Set the address bus to the address on the stack
-                 * Write the current status register to the data bus
-                 * decrement the stack pointer for next operation
-                 */
                 case (2):
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
@@ -1333,10 +1547,6 @@ namespace Poly6502.Microprocessor
 
                     _instructionCycles++;
                     break;
-                /*
-                 * Tell everyone we now want to read
-                 * Set the address bus to address 0xFFFE
-                 */
                 case (3):
                     UpdateRw(true);
                     AddressBusAddress = 0xFFFE;
@@ -1344,10 +1554,6 @@ namespace Poly6502.Microprocessor
 
                     _instructionCycles++;
                     break;
-                /*
-                 * read the data from the databus into the PC.
-                 * Set the address bus to address 0xFFFF
-                 */
                 case (4):
                     AddressBusAddress = 0x0000;
                     AddressBusAddress = DataBusData;
@@ -1356,10 +1562,6 @@ namespace Poly6502.Microprocessor
 
                     _instructionCycles++;
                     break;
-                /*
-                 * Read the data bus into the hi byte of the PC
-                 * Opcode Complete
-                 */
                 case (5):
                     AddressBusAddress = (ushort) (DataBusData << 8);
                     P.SetFlag(StatusRegisterFlags.B, false);
@@ -1371,7 +1573,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Overflow Clear
+        /// BVC - Branch on Overflow Clear
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BVC()
         {
@@ -1388,7 +1597,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Overflow Set
+        /// BVS - Branch on Overflow Set
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BVS()
         {
@@ -1404,7 +1620,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Clear Carry Flag
+        /// CLC (CLear Carry)
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLC()
         {
@@ -1414,7 +1642,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Clear Decimal Mode
+        /// CLD (CLear Decimal)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.D"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLD()
         {
@@ -1425,7 +1665,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Clear Interrupt Disable Bit
+        /// CLI (CLear Interrupt)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.I"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLI()
         {
@@ -1433,7 +1685,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Clear Overflow Flag
+        /// CLV (CLear oVerflow)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLV()
         {
@@ -1444,7 +1708,55 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Compare Memory and Accumulator 
+        /// CMP (CoMPare accumulator)
+        ///
+        /// Compare sets flags as if a subtraction had been carried out. If the value in the
+        /// accumulator is >= the compared value, the <see cref="StatusRegisterFlags.C"/> flag will be set.
+        ///
+        /// The <see cref="StatusRegisterFlags.Z"/> and <see cref="StatusRegisterFlags.N"/> flags will be set based
+        /// on equality or lack thereof and the sign of the accumulator.
+        ///  
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CMP()
         {
@@ -1475,7 +1787,32 @@ namespace Poly6502.Microprocessor
 
 
         /// <summary>
-        /// Compare Memory and Index X
+        /// CPX (ComPare X register)
+        ///
+        /// The compare X register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CPX()
         {
@@ -1502,7 +1839,32 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Compare Memory and Index Y
+        /// CPY (ComPare Y register)
+        ///
+        /// The compare Y register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CPY()
         {
@@ -1532,7 +1894,35 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Decrement Memory by 1
+        /// DEC (DECrement memory)
+        ///
+        /// The compare X register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEC()
         {
@@ -1563,7 +1953,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Decrement Index X by 1
+        /// DEX (DEcrement X)
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEX()
         {
@@ -1589,7 +1986,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Decrement Index Y by 1
+        /// DEY (DEcrement Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEY()
         {
@@ -1615,7 +2019,48 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Exclusive OR Memory with Accumulator
+        /// EOR (bitwise Exclusive OR)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void EOR()
         {
@@ -1644,7 +2089,33 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Increment Memory by 1
+        /// INC (INCrement memory)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INC()
         {
@@ -1674,7 +2145,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Increment Index X by 1
+        /// INX (INcrement X)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INX()
         {
@@ -1700,7 +2178,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Increment Index Y by 1
+        /// INY (INcrement Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INY()
         {
@@ -1727,9 +2212,23 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Jump to New Location
+        /// JMP (JuMP)
         ///
-        /// 3 cycles
+        /// JMP transfers program execution to the following address (absolute) or to the
+        /// location contained in the following address (indirect).
+        ///
+        /// Note that there is no carry associated with the indirect jump.
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void JMP()
         {
@@ -1739,8 +2238,18 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Jump to New Location
-        /// Saving Return Address
+        /// JSR (Jump to SubRoutine)
+        /// 
+        /// JSR pushes (address - 1) of the next operation on to the stack before
+        /// transferring program control to the following address.
+        ///
+        /// Subroutines are normally terminated by the <see cref="RTS"/> opcode.
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void JSR()
         {
@@ -1777,7 +2286,49 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Load the Accumulator with Memory
+        /// LDA (LoaD Accumulator)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDA()
         {
@@ -1785,6 +2336,7 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -1794,8 +2346,9 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    // TODO something else should incrementing this
+                    // AddressBusAddress++;
+                    // OutputAddressToPins(AddressBusAddress);
 
                     EndOpCode();
                     break;
@@ -1804,7 +2357,37 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Load Index X with Memory
+        /// LDX (LoaD X register)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, Y: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDX()
         {
@@ -1831,7 +2414,36 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Load Index Y with Memory
+        /// LDY (Load Y register)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDY()
         {
@@ -1858,7 +2470,40 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Shift 1 bit right (Memory or Accumulation)
+        /// LSR (Logical Shift Right)
+        /// 
+        /// LSR shifts all bits right 1 position.
+        /// 0 is shifted into bit 7 and the original bit 0 is shifted
+        /// into <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LSR()
         {
@@ -1895,7 +2540,15 @@ namespace Poly6502.Microprocessor
 
 
         /// <summary>
-        /// No Operation
+        /// NOP (No Operation)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void NOP()
         {
@@ -1921,7 +2574,48 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// OR Memory with Accumulator
+        /// ORA (bitwise OR with Accumulator)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ORA()
         {
@@ -2080,7 +2774,41 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Rotate 1 bit left (Memory or Accumulator)
+        /// ROL (ROtate Left)
+        ///
+        /// ROL shifts all the bits left 1 position.
+        ///
+        /// The <see cref="StatusRegisterFlags.C"/> is shifted into bit 0 and
+        /// the original bit 7 is shifted into the <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ROL()
         {
@@ -2117,9 +2845,39 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Rotate 1 bit right (Memory or Accumulator)
+        /// ROR (ROtate Right)
         ///
-        /// C -> [76543210] -> C
+        /// ROR shifts all the bits right one position. The <see cref="StatusRegisterFlags.C"/> is shifted into bit 7 and the original
+        /// bit 0 is shifted into the <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ROR()
         {
@@ -2156,7 +2914,21 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Return from Interrupt
+        /// RTI (ReTurn from Interrupt
+        ///
+        /// RTI retrieves the <see cref="P"/> and the program counter form the stack
+        /// in that order.
+        /// <remarks>
+        /// Affects the following Flags
+        /// ALL
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void RTI()
         {
@@ -2204,7 +2976,17 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Return from Subroutine
+        /// RTS (ReTurn from Subroutine
+        ///
+        /// 
+        /// RTS pulls the top 2 bytes off the stack (little endian) and xfers
+        /// program control to (address + 1).
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void RTS()
         {
@@ -2242,7 +3024,55 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Subtract Memory from Accumulator with Borrow
+        /// SBC (SuBtract with Carry)
+        ///
+        /// SBC results are dependant on the setting of the <see cref="StatusRegisterFlags.D"/> flag.
+        ///
+        /// In decimal mode, subtraction is carried out on the assumption thgat values involved are packed BCD.
+        ///
+        /// There is no way to subtract without carry.
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void SBC()
         {
@@ -2273,7 +3103,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Set Carry Flag
+        /// SEC (SEt Carry)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void SEC()
         {
@@ -2296,7 +3138,19 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Set Decimal Mode
+        /// SED (SEt Decimal)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.D"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void SED()
         {
@@ -2320,7 +3174,20 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Set Interrupt Enable Status
+        /// SEI (SEt Interrupt)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.I"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
+        ///
         /// </summary>
         public void SEI()
         {
@@ -2344,7 +3211,39 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Store Accumulator in Memory
+        /// STA (STore Accumulator)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void STA()
         {
@@ -2420,7 +3319,15 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer Accumulator to Index X
+        /// TAX (Transfer A to X)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void TAX()
         {
@@ -2446,7 +3353,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer Accumulator to IndexY
+        /// TAY (Transfer A to Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void TAY()
         {
@@ -2499,7 +3413,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer  Index X to Accumulator
+        /// TXA (Transfer X to A)
         /// </summary>
         public void TXA()
         {
@@ -2548,7 +3462,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer Index Y to Accumulator
+        /// TYA (Transfer Y to A)
         /// </summary>
         public void TYA()
         {

@@ -23,7 +23,6 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
                 /* Zero Page */   new CycleTruthData(0x84, 3),
                 /* Zero Page X */ new CycleTruthData(0x94, 4),
                 /* Absolute */    new CycleTruthData(0x8C, 4),
-
             };
         }
         
