@@ -5,7 +5,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Poly6502.csproj" />
       <ProjectReference Include="..\Poly6502.Interfaces\Poly6502.Interfaces.csproj" />
     </ItemGroup>
 
