@@ -1570,9 +1570,10 @@ namespace Poly6502.Microprocessor
                 case (5):
                     AddressBusAddress = (ushort) (DataBusData << 8);
                     P.SetFlag(StatusRegisterFlags.B, false);
-                    EndOpCode();
 
                     _instructionCycles++;
+
+                    EndOpCode();
                     break;
             }
         }
