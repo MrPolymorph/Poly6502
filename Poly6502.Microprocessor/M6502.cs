@@ -3956,11 +3956,13 @@ namespace Poly6502.Microprocessor
                         OpCode = kvp.Value.Read(AddressBusAddress);
                     }
                 }
-
                 CurrentOperation = OpCodeLookupTable[OpCode];
-
-                FetchComplete?.Invoke(this, null);
             }
+
+            CurrentOperation.AddressingModeMethod();
+
+            FetchComplete?.Invoke(this, null);
+            
         }
 
         public void Execute()
