@@ -15,6 +15,11 @@ namespace Poly6502.Microprocessor
     {
         private ushort _offset;
 
+        public event EventHandler ClockComplete;
+        public event EventHandler OpComplete;
+        public event EventHandler AddressChanged;
+        public event EventHandler FetchComplete;
+
         public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
 
         /// <summary>
@@ -3931,37 +3936,44 @@ namespace Poly6502.Microprocessor
 
             if (!OpCodeInProgress)
                 Fetch();
-
-            if (!AddressingModeInProgress)
-                Execute();
+            
+            Execute();
+            
+            ClockComplete?.Invoke(this, null);
         }
 
         public void Fetch()
         {
-            if (!AddressingModeInProgress)
+            if (!AddressingModeInProgress && !OpCodeInProgress)
             {
                 AddressingModeInProgress = true;
 
-                foreach (var device in _dataCompatibleDevices)
+                foreach (var kvp in _dataCompatibleDevices)
                 {
-                    if (!device.PropagationOverridden)
+                    if (!kvp.Value.PropagationOverridden)
                     {
-                        OpCode = device.Read(AddressBusAddress);
+                        OpCode = kvp.Value.Read(AddressBusAddress);
                     }
                 }
 
                 CurrentOperation = OpCodeLookupTable[OpCode];
-            }
 
-            CurrentOperation.AddressingModeMethod();
+                FetchComplete?.Invoke(this, null);
+            }
         }
 
         public void Execute()
         {
-            if (AddressingModeInProgress) return;
-
-            OpCodeInProgress = true;
-            CurrentOperation.OpCodeMethod();
+            if (AddressingModeInProgress)
+            {
+                CurrentOperation.AddressingModeMethod();
+            }
+            
+            if(!AddressingModeInProgress)
+            {
+                OpCodeInProgress = true;
+                CurrentOperation.OpCodeMethod();
+            }
         }
 
         /// <summary>
@@ -3980,12 +3992,12 @@ namespace Poly6502.Microprocessor
 
         public void ProgramCounterInitialisation()
         {
-            foreach (var device in _dataCompatibleDevices)
+            foreach (var kvp in _dataCompatibleDevices)
             {
-                if (!device.PropagationOverridden)
+                if (!kvp.Value.PropagationOverridden)
                 {
-                    InstructionLoByte = device.Read(0xFFFC);
-                    InstructionHiByte = device.Read(0xFFFD);
+                    InstructionLoByte = kvp.Value.Read(0xFFFC);
+                    InstructionHiByte = kvp.Value.Read(0xFFFD);
 
                     PC = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
                     AddressBusAddress = PC;
@@ -3997,31 +4009,29 @@ namespace Poly6502.Microprocessor
         /// Pin 40
         /// RESET
         /// </summary>
-        public void RES()
+        public void RES(ushort address = 0x0000)
         {
-            //On a reset, the cpu will look at
-            //memory location 0xFFFC for an opcode to run
-            //this will take two cycles
-            //one for the lo byte, one for the hi byte.            
-            SP = 0xFD;
-
-            AddressBusAddress = 0xC000;
-            PC = 0xBFFF;
             _instructionCycles = 0;
             _addressingModeCycles = 0;
+            
+            SP = 0xFD;
+            AddressBusAddress = 0x0000;
+            PC = 0xBFFF;
             AddressingModeInProgress = false;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
-
-
-            //output the address to the address bus
-            //so that, on the next cycle, data can be picked up
-            //outputted from ram/rom
-            ProgramCounterInitialisation();
+            
+            if(address == 0x0000)
+                ProgramCounterInitialisation();
+            else
+            {
+                PC = address;
+                AddressBusAddress = address;
+            }
+            
             UpdateRw(true);
         }
-
 
         private void BeginOpCode()
         {
@@ -4045,6 +4055,7 @@ namespace Poly6502.Microprocessor
             _addressingModeCycles = 0;
             _instructionCycles = 0;
             CpuRead = true;
+            OpComplete?.Invoke(this, null);
         }
 
         private void OutputAddressToPins(ushort address)
@@ -4062,22 +4073,23 @@ namespace Poly6502.Microprocessor
                 }
             }
 #else
-            foreach (var device in _dataCompatibleDevices)
+            foreach (var kvp in _dataCompatibleDevices)
             {
-                if (!device.PropagationOverridden)
+                if (!kvp.Value.PropagationOverridden)
                 {
-                    DataBusData = device.Read(AddressBusAddress);
+                    DataBusData = kvp.Value.Read(AddressBusAddress);
                 }
             }
+            AddressChanged?.Invoke(this, null);
 #endif
         }
 
         private void UpdateRw(bool cpuRead)
         {
             CpuRead = cpuRead;
-            foreach (var busDevices in _dataCompatibleDevices)
+            foreach (var kvp in _dataCompatibleDevices)
             {
-                busDevices.SetRW(CpuRead);
+                kvp.Value.SetRW(CpuRead);
             }
         }
 

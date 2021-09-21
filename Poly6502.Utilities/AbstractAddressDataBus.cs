@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Linq;
 using Poly6502.Interfaces;
 
 namespace Poly6502.Utilities
@@ -9,12 +9,16 @@ namespace Poly6502.Utilities
     {
         private bool _ignorePropagation;
         
-        protected readonly IList<IAddressBusCompatible> _addressCompatibleDevices;
-        protected readonly IList<IDataBusCompatible> _dataCompatibleDevices;
+        protected readonly IDictionary<int, IAddressBusCompatible> _addressCompatibleDevices;
+        protected readonly IDictionary<int, IDataBusCompatible> _dataCompatibleDevices;
         protected byte DataBusData { get; set; }
         protected bool CpuRead { get; set; }
-        protected ushort AddressBusAddress { get; set; }
         protected ushort RelativeAddress { get; set; }
+        
+        public ushort MaxAddressableRange { get; protected set; }
+        public ushort MinAddressableRange { get; protected set; }
+        
+        public ushort AddressBusAddress { get; protected set; }
         public Dictionary<int, Action<float>> AddressBusLines { get; set; }
         
         public bool PropagationOverridden { get; private set; }
@@ -28,8 +32,8 @@ namespace Poly6502.Utilities
             AddressBusLines = new Dictionary<int, Action<float>>();
             
             _ignorePropagation = false;
-            _addressCompatibleDevices = new List<IAddressBusCompatible>();
-            _dataCompatibleDevices = new Collection<IDataBusCompatible>();
+            _addressCompatibleDevices = new Dictionary<int, IAddressBusCompatible>();
+            _dataCompatibleDevices = new Dictionary<int, IDataBusCompatible>();
 
             PropagationOverridden = false;
 
@@ -63,26 +67,37 @@ namespace Poly6502.Utilities
 #endif
         }
 
-        public void RegisterDevice(IAddressBusCompatible device)
+        public void RegisterDevice(IAddressBusCompatible device, int propagationPriority)
         {
-            _addressCompatibleDevices.Add(device);
+            if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
+            {
+                _addressCompatibleDevices.Add(propagationPriority, device);
+            }
 
             if (device is IDataBusCompatible compatible)
             {
-                if (!_dataCompatibleDevices.Contains(compatible))
-                    _dataCompatibleDevices.Add(compatible);
+                if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
+                    _dataCompatibleDevices.Add(propagationPriority, compatible);
             }
         }
 
-        public void RegisterDevice(IDataBusCompatible device)
+        public void RegisterDevice(IDataBusCompatible device,  int propagationPriority)
         {
-            _dataCompatibleDevices.Add(device);
+            if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
+            {
+                _dataCompatibleDevices.Add(propagationPriority, device);
+            }
 
             if (device is IAddressBusCompatible compatible)
             {
-                if (!_addressCompatibleDevices.Contains(compatible))
-                    _addressCompatibleDevices.Add(compatible);
+                if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
+                    _addressCompatibleDevices.Add(propagationPriority, compatible);
             }
+        }
+
+        public void RegisterDevice(IAddressBusCompatible device)
+        {
+            throw new NotImplementedException();
         }
 
         public void SetAddress(ushort address)
@@ -106,7 +121,7 @@ namespace Poly6502.Utilities
         {
             if (!PropagationOverridden)
             {
-                foreach (var device in _dataCompatibleDevices)
+                foreach (var kvp in _dataCompatibleDevices.OrderBy(x => x.Key))
                 {
 #if EMULATE_PIN_OUTPUT
                     for (int i = 0; i < 8; i++)
@@ -117,9 +132,9 @@ namespace Poly6502.Utilities
                     }
 #else
                     if (CpuRead)
-                        DataBusData = device.Read(AddressBusAddress);
+                        DataBusData = kvp.Value.Read(AddressBusAddress);
                     else
-                        device.Write(AddressBusAddress, DataBusData);
+                        kvp.Value.Write(AddressBusAddress, DataBusData);
 #endif
                 }
             }
@@ -129,7 +144,7 @@ namespace Poly6502.Utilities
         {
             foreach (var device in _dataCompatibleDevices)
             {
-                device.PropagationOverride(propagate, this);
+                device.Value.PropagationOverride(propagate, this);
             }
         }
 

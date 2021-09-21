@@ -16,7 +16,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             _m6502 = new M6502();
             _mockRam = new Mock<IDataBusCompatible>();
             
-            _m6502.RegisterDevice(_mockRam.Object);
+            _m6502.RegisterDevice(_mockRam.Object, 1);
         }
 
         [Test]
