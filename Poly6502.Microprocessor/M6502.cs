@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Utilities;
@@ -3947,9 +3948,10 @@ namespace Poly6502.Microprocessor
         {
             if (!AddressingModeInProgress && !OpCodeInProgress)
             {
+                PC = AddressBusAddress;
                 AddressingModeInProgress = true;
 
-                foreach (var kvp in _dataCompatibleDevices)
+                foreach (var kvp in _dataCompatibleDevices.OrderBy(x => x.Key))
                 {
                     if (!kvp.Value.PropagationOverridden)
                     {
@@ -4017,7 +4019,7 @@ namespace Poly6502.Microprocessor
             
             SP = 0xFD;
             AddressBusAddress = 0x0000;
-            PC = 0xBFFF;
+            PC = AddressBusAddress;
             AddressingModeInProgress = false;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
