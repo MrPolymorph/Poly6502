@@ -3945,26 +3945,6 @@ namespace Poly6502.Microprocessor
         }
 
         public void Fetch()
-<<<<<<< HEAD
-        {
-            if (!AddressingModeInProgress && !OpCodeInProgress)
-            {
-                PC = AddressBusAddress;
-                AddressingModeInProgress = true;
-
-                foreach (var kvp in _dataCompatibleDevices.OrderBy(x => x.Key))
-                {
-                    if (!kvp.Value.PropagationOverridden)
-                    {
-                        OpCode = kvp.Value.Read(AddressBusAddress);
-                    }
-                }
-
-                CurrentOperation = OpCodeLookupTable[OpCode];
-
-                FetchComplete?.Invoke(this, null);
-            }
-=======
         {
             if (!AddressingModeInProgress && !OpCodeInProgress)
             {
@@ -3983,8 +3963,6 @@ namespace Poly6502.Microprocessor
             CurrentOperation.AddressingModeMethod();
 
             FetchComplete?.Invoke(this, null);
-            
->>>>>>> dfda4d279541fe14c8abfdd78e07481b62e9642e
         }
 
         public void Execute()
