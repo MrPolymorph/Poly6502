@@ -116,8 +116,12 @@ namespace Poly6502.Utilities
                 PropagationOverridden = ovr;
         }
 
-
         protected virtual void OutputDataToDatabus()
+        {
+            OutputDataToDatabus(AddressBusAddress);
+        }
+        
+        protected virtual void OutputDataToDatabus(ushort address)
         {
             if (!PropagationOverridden)
             {
@@ -132,9 +136,9 @@ namespace Poly6502.Utilities
                     }
 #else
                     if (CpuRead)
-                        DataBusData = kvp.Value.Read(AddressBusAddress);
+                        DataBusData = kvp.Value.Read(address);
                     else
-                        kvp.Value.Write(AddressBusAddress, DataBusData);
+                        kvp.Value.Write(address, DataBusData);
 #endif
                 }
             }

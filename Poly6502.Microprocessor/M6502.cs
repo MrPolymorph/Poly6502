@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Utilities;
@@ -15,6 +14,7 @@ namespace Poly6502.Microprocessor
     public class M6502 : AbstractAddressDataBus
     {
         private ushort _offset;
+        public bool FetchInstruction { get; private set; }
 
         public event EventHandler ClockComplete;
         public event EventHandler OpComplete;
@@ -516,6 +516,9 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case (0):
+                    InstructionLoByte = 0;
+                    InstructionHiByte = 0;
+                    
                     AddressBusAddress++;
                     OutputAddressToPins(AddressBusAddress);
                     _addressingModeCycles++;
@@ -862,6 +865,7 @@ namespace Poly6502.Microprocessor
         {
             OpCodeInProgress = true;
             AddressingModeInProgress = false;
+            
         }
 
         /// <summary>
@@ -1004,12 +1008,12 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void AND()
         {
-            BeginOpCode();
 
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -1102,12 +1106,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void ARR()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -1156,12 +1159,11 @@ namespace Poly6502.Microprocessor
 
         public void ALR()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -1290,6 +1292,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BCC()
         {
+            BeginOpCode();
+            
             if (!P.HasFlag(StatusRegisterFlags.C))
             {
                 AddressBusAddress += DataBusData;
@@ -1298,7 +1302,7 @@ namespace Poly6502.Microprocessor
 
             AddressBusAddress++;
 
-            OpCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
@@ -1313,6 +1317,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BCS()
         {
+            BeginOpCode();
+            
             if (P.HasFlag(StatusRegisterFlags.C))
             {
                 AddressBusAddress++;
@@ -1339,6 +1345,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BEQ()
         {
+            BeginOpCode();
+            
             if (P.HasFlag(StatusRegisterFlags.Z))
             {
                 AddressBusAddress += DataBusData;
@@ -1379,11 +1387,12 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BIT()
         {
-            BeginOpCode();
+            
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     OutputAddressToPins((ushort) (InstructionHiByte << 8 | InstructionLoByte));
                     _instructionCycles++;
                     break;
@@ -1442,6 +1451,8 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
+                    
                     if (!P.HasFlag(StatusRegisterFlags.Z))
                     {
                         var absolute = AddressBusAddress + RelativeAddress;
@@ -1591,6 +1602,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BVC()
         {
+            BeginOpCode();
+            
             if (!P.HasFlag(StatusRegisterFlags.V))
             {
                 AddressBusAddress += DataBusData;
@@ -1615,6 +1628,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void BVS()
         {
+            BeginOpCode();
+            
             if (P.HasFlag(StatusRegisterFlags.V))
             {
                 AddressBusAddress += DataBusData;
@@ -1643,9 +1658,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void CLC()
         {
+            BeginOpCode();
             P.SetFlag(StatusRegisterFlags.C, false);
             AddressBusAddress++;
             OpCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
@@ -1665,6 +1682,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void CLD()
         {
+            BeginOpCode();
             P.SetFlag(StatusRegisterFlags.D, false);
             AddressBusAddress++;
             OutputAddressToPins(AddressBusAddress);
@@ -1688,7 +1706,9 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void CLI()
         {
+            BeginOpCode();
             P.SetFlag(StatusRegisterFlags.I, false);
+            EndOpCode();
         }
 
         /// <summary>
@@ -1879,13 +1899,12 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
                 case (1):
                 {
-                    BeginOpCode();
-
                     var result = Y - DataBusData;
 
                     P.SetFlag(StatusRegisterFlags.Z, result == 0);
@@ -2071,12 +2090,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void EOR()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -2239,6 +2257,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void JMP()
         {
+            BeginOpCode();
             AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
             OutputAddressToPins(AddressBusAddress);
             EndOpCode();
@@ -2270,16 +2289,17 @@ namespace Poly6502.Microprocessor
                 }
                 case (1): //store the hi byte
                     UpdateRw(false);
-                    OutputAddressToPins((ushort) (0x0100 + SP));
+                    var temp = (ushort) (0x0100 + SP);
                     DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
-                    OutputDataToDatabus();
+                    OutputDataToDatabus(temp);
                     SP--;
                     _instructionCycles++;
                     break;
                 case (2): //store the lo byte
                     UpdateRw(false);
-                    OutputAddressToPins((ushort) (0x0100 + SP));
+                    temp = (ushort) (0x0100 + SP);
                     DataBusData = (byte) ((AddressBusAddress & 0x00FF));
+                    OutputDataToDatabus(temp);
                     SP--;
                     _instructionCycles++;
                     break;
@@ -2352,10 +2372,9 @@ namespace Poly6502.Microprocessor
                     A = DataBusData;
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-
-                    // TODO something else should incrementing this
-                    // AddressBusAddress++;
-                    // OutputAddressToPins(AddressBusAddress);
+                    
+                    AddressBusAddress++;
+                    OutputAddressToPins(AddressBusAddress);
 
                     EndOpCode();
                     break;
@@ -2630,6 +2649,7 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
@@ -2686,12 +2706,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PHP()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case 0:
                 {
+                    BeginOpCode();
                     TempAddress = AddressBusAddress;
                     AddressBusAddress = (ushort) (0x0100 | SP);
                     P.SetFlag(StatusRegisterFlags.B);
@@ -2757,12 +2776,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PLP()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     SP++;
                     OutputAddressToPins((ushort) (SP | 0x0100));
                     _instructionCycles++;
@@ -2939,12 +2957,11 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void RTI()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     SP++;
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
@@ -2997,12 +3014,12 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void RTS()
         {
-            BeginOpCode();
 
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     SP++;
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
@@ -3015,6 +3032,7 @@ namespace Poly6502.Microprocessor
                     SP++;
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = DataBusData;
                     _instructionCycles++;
                     break;
                 }
@@ -3139,6 +3157,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.C);
                     AddressBusAddress++;
                     OpCodeInProgress = false;
+                    EndOpCode();
                     break;
                 }
             }
@@ -3266,7 +3285,7 @@ namespace Poly6502.Microprocessor
                 {
                     UpdateRw(false);
                     DataBusData = A;
-                    OutputDataToDatabus();
+                    OutputDataToDatabus((ushort)(InstructionHiByte << 8 | InstructionLoByte));
                     OpCodeInProgress = false;
                     AddressBusAddress++;
                     EndOpCode();
@@ -3946,7 +3965,7 @@ namespace Poly6502.Microprocessor
 
         public void Fetch()
         {
-            if (!AddressingModeInProgress && !OpCodeInProgress)
+            if (FetchInstruction)
             {
                 AddressingModeInProgress = true;
 
@@ -3958,11 +3977,11 @@ namespace Poly6502.Microprocessor
                     }
                 }
                 CurrentOperation = OpCodeLookupTable[OpCode];
+
+                FetchInstruction = false;
+                
+                FetchComplete?.Invoke(this, null);
             }
-
-            CurrentOperation.AddressingModeMethod();
-
-            FetchComplete?.Invoke(this, null);
         }
 
         public void Execute()
@@ -4020,7 +4039,8 @@ namespace Poly6502.Microprocessor
             SP = 0xFD;
             AddressBusAddress = 0x0000;
             PC = AddressBusAddress;
-            AddressingModeInProgress = false;
+            AddressingModeInProgress = true;
+            FetchInstruction = true;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
@@ -4052,7 +4072,8 @@ namespace Poly6502.Microprocessor
         private void EndOpCode()
         {
             OpCodeInProgress = false;
-            AddressingModeInProgress = false;
+            AddressingModeInProgress = true;
+            FetchInstruction = true;
             PreviousInstructionCycleLength = _instructionCycles;
             PreviousAddressingModeCycleLength = _addressingModeCycles;
             _addressingModeCycles = 0;
@@ -4080,7 +4101,7 @@ namespace Poly6502.Microprocessor
             {
                 if (!kvp.Value.PropagationOverridden)
                 {
-                    DataBusData = kvp.Value.Read(AddressBusAddress);
+                    DataBusData = kvp.Value.Read(address);
                 }
             }
             AddressChanged?.Invoke(this, null);
