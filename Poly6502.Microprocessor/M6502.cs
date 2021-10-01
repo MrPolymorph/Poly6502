@@ -3032,7 +3032,6 @@ namespace Poly6502.Microprocessor
                     SP++;
                     AddressBusAddress = (ushort) (0x0100 + SP);
                     OutputAddressToPins(AddressBusAddress);
-                    InstructionLoByte = DataBusData;
                     _instructionCycles++;
                     break;
                 }
