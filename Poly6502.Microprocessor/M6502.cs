@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
+using Poly6502.Microprocessor.Models;
 using Poly6502.Utilities;
+using Poly6502.Utilities.Arguments;
 
 namespace Poly6502.Microprocessor
 {
@@ -14,49 +17,121 @@ namespace Poly6502.Microprocessor
     public class M6502 : AbstractAddressDataBus
     {
         private ushort _offset;
+
+        private byte _a;
+        private byte _x;
+        private byte _y;
+        private byte _sp;
+        private int _instructionCycles;
+        private int _addressingModeCycles;
+        private StatusRegister _p;
+        private Operation _currentOperation;
+        
         public bool FetchInstruction { get; private set; }
 
         public event EventHandler ClockComplete;
         public event EventHandler OpComplete;
-        public event EventHandler AddressChanged;
         public event EventHandler FetchComplete;
+        public event ProcessorEventHandler ProcessorStateChange;
+
+        public delegate void ProcessorEventHandler(object? sender, ProcessorStateChangedEventArgs args);
 
         public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
-
+        
+        
         /// <summary>
         /// Accumulator
         /// </summary>
-        public byte A { get; private set; }
+        public byte A
+        {
+            get => _a;
+            private set
+            {
+                
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.ARegister,
+                    _a, value));
+                
+                _a = value;
+            }
+        }
 
         /// <summary>
         /// X Register
         /// </summary>
-        public byte X { get; private set; }
+        public byte X
+        {
+            get => _x;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.XRegister,
+                    _x, value));
+                
+                _x = value;
+            }
+        }
 
         /// <summary>
         /// Y Register
         /// </summary>
-        public byte Y { get; private set; }
+        public byte Y
+        {
+            get => _y;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.YRegister,
+                    _y, value));
+                
+                _y = value;
+            }
+        }
 
         /// <summary>
         /// Stack Pointer
         /// </summary>
-        public byte SP { get; private set; }
+        public byte SP
+        {
+            get => _sp;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.StackPointer,
+                    _sp, value));
+
+                _sp = value;
+            }
+        }
 
         public ushort PC { get; set; }
 
         public byte InstructionLoByte { get; set; }
         public byte InstructionHiByte { get; set; }
 
-        private int _instructionCycles;
-        private int _addressingModeCycles;
 
         /// <summary>
         /// Status Register / Processor Flags
         /// </summary>
-        public StatusRegister P { get; private set; }
+        public StatusRegister P
+        {
+            get => _p;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.StatusRegister,
+                    _p, value));
 
-        public Operation CurrentOperation { get; private set; }
+                _p = value;
+            }
+        }
+
+        public Operation CurrentOperation
+        {
+            get => _currentOperation;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.Op,
+                    _currentOperation, value));
+
+                _currentOperation = value;
+            }
+        }
 
         public byte OpCode { get; private set; }
 
@@ -404,6 +479,17 @@ namespace Poly6502.Microprocessor
 
                 /* LAS Illegal Opcodes */
                 {0xBB, new Operation(LAS, ABY)},
+            };
+
+            AddressChanged += (sender, args) =>
+            {
+                if (args is AddressChangedEventArgs addressArgs)
+                {
+                    ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(
+                        StateChangeType.ProgramCounter, addressArgs.OldAddress, addressArgs.NewAddress
+                    ));
+                }
+
             };
 
             RES();
@@ -2711,20 +2797,16 @@ namespace Poly6502.Microprocessor
                 case 0:
                 {
                     BeginOpCode();
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort) (0x0100 | SP);
-                    P.SetFlag(StatusRegisterFlags.B);
                     UpdateRw(false);
-                    OutputAddressToPins(AddressBusAddress);
                     DataBusData = P.Register;
-                    OutputDataToDatabus();
+                    OutputDataToDatabus((ushort) (0x0100 | SP));
+                    P.SetFlag(StatusRegisterFlags.B);
                     SP--;
                     break;
                 }
                 case 1:
                 {
                     P.SetFlag(StatusRegisterFlags.B, false);
-                    AddressBusAddress = TempAddress;
                     AddressBusAddress++;
                     OutputAddressToPins(AddressBusAddress);
                     EndOpCode();
@@ -2791,6 +2873,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(DataBusData);
                     P.SetFlag(StatusRegisterFlags.B, false);
                     P.SetFlag(StatusRegisterFlags.Reserved, true);
+                    P.SetFlag(StatusRegisterFlags.I, true);
                     AddressBusAddress++;
                     EndOpCode();
                     break;
@@ -4103,7 +4186,6 @@ namespace Poly6502.Microprocessor
                     DataBusData = kvp.Value.Read(address);
                 }
             }
-            AddressChanged?.Invoke(this, null);
 #endif
         }
 

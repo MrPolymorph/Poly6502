@@ -2,12 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Poly6502.Interfaces;
+using Poly6502.Utilities.Arguments;
 
 namespace Poly6502.Utilities
 {
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
         private bool _ignorePropagation;
+
+        private ushort _addressBusAddress;
+        protected event EventHandler AddressChanged;
         
         protected readonly IDictionary<int, IAddressBusCompatible> _addressCompatibleDevices;
         protected readonly IDictionary<int, IDataBusCompatible> _dataCompatibleDevices;
@@ -15,15 +19,24 @@ namespace Poly6502.Utilities
         protected bool CpuRead { get; set; }
         protected ushort RelativeAddress { get; set; }
         
+        
         public ushort MaxAddressableRange { get; protected set; }
         public ushort MinAddressableRange { get; protected set; }
+
+        public ushort AddressBusAddress
+        {
+            get => _addressBusAddress; 
+            protected set
+            {
+                AddressChanged?.Invoke(this, new AddressChangedEventArgs(_addressBusAddress, value));
+                _addressBusAddress = value;
+            }
+        }
         
-        public ushort AddressBusAddress { get; protected set; }
-        public Dictionary<int, Action<float>> AddressBusLines { get; set; }
         
         public bool PropagationOverridden { get; private set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
-
+        public Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
         protected AbstractAddressDataBus()
         {
