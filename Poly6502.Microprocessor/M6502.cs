@@ -18,15 +18,49 @@ namespace Poly6502.Microprocessor
     {
         private ushort _offset;
 
+        /// <summary>
+        /// 8-bit A register
+        /// </summary>
         private byte _a;
+        
+        /// <summary>
+        /// 8-bit X register
+        /// </summary>
         private byte _x;
+        
+        /// <summary>
+        /// 8-bit Y register
+        /// </summary>
         private byte _y;
+        
+        /// <summary>
+        /// 8-bit stack pointer
+        /// </summary>
         private byte _sp;
+        
+        /// <summary>
+        /// current instruction cycles
+        /// </summary>
         private int _instructionCycles;
+        
+        /// <summary>
+        /// current addressing mode cycles.
+        /// </summary>
         private int _addressingModeCycles;
+        
+        /// <summary>
+        /// 8-bit status register
+        /// </summary>
         private StatusRegister _p;
+        
+        /// <summary>
+        /// Current op 
+        /// </summary>
         private Operation _currentOperation;
         
+        /// <summary>
+        /// Set if the microprocessor is currently fetching the instruction to run.
+        /// </summary>
         public bool FetchInstruction { get; private set; }
 
         public event EventHandler ClockComplete;
@@ -36,11 +70,14 @@ namespace Poly6502.Microprocessor
 
         public delegate void ProcessorEventHandler(object? sender, ProcessorStateChangedEventArgs args);
 
+        /// <summary>
+        /// Op Code lookup table.
+        /// </summary>
         public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
         
         
         /// <summary>
-        /// Accumulator
+        /// 8-Bit Accumulator
         /// </summary>
         public byte A
         {
@@ -56,7 +93,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// X Register
+        /// 8-Bit X Register
         /// </summary>
         public byte X
         {
@@ -71,7 +108,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Y Register
+        /// 8-Bit Y Register
         /// </summary>
         public byte Y
         {
@@ -86,7 +123,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Stack Pointer
+        /// 8-Bit Stack Pointer
         /// </summary>
         public byte SP
         {
@@ -100,14 +137,24 @@ namespace Poly6502.Microprocessor
             }
         }
 
-        public ushort PC { get; set; }
+        /// <summary>
+        /// 16-Bit Program Counter
+        /// </summary>
+        public ushort Pc { get; set; }
 
+        /// <summary>
+        /// The current instruction Lo Byte 
+        /// </summary>
         public byte InstructionLoByte { get; set; }
+        
+        /// <summary>
+        /// The current instruction Hi Byte
+        /// </summary>
         public byte InstructionHiByte { get; set; }
 
 
         /// <summary>
-        /// Status Register / Processor Flags
+        /// 8-Bit Status Register / Processor Flags
         /// </summary>
         public StatusRegister P
         {
@@ -121,6 +168,9 @@ namespace Poly6502.Microprocessor
             }
         }
 
+        /// <summary>
+        /// The operation function currently being run.
+        /// </summary>
         public Operation CurrentOperation
         {
             get => _currentOperation;
@@ -133,17 +183,44 @@ namespace Poly6502.Microprocessor
             }
         }
 
+        /// <summary>
+        /// The op code currently being run.
+        /// </summary>
         public byte OpCode { get; private set; }
 
+        /// <summary>
+        /// Voltage from the input pin.
+        /// </summary>
         public float InputVoltage { get; private set; }
 
+        /// <summary>
+        /// ???
+        /// </summary>
         public ushort TempAddress { get; private set; }
+        
+        /// <summary>
+        /// True if an instruction is being executed.
+        /// </summary>
         public bool OpCodeInProgress { get; private set; }
+        
+        /// <summary>
+        /// True if the addressing mode is being processed.
+        /// </summary>
         public bool AddressingModeInProgress { get; private set; }
 
+        /// <summary>
+        /// Stores the length of the previous instructions cycle
+        /// </summary>
         public int PreviousInstructionCycleLength { get; private set; }
+        
+        /// <summary>
+        /// Stores the length of the previous addressing cycle
+        /// </summary>
         public int PreviousAddressingModeCycleLength { get; private set; }
 
+        /// <summary>
+        /// constructor.
+        /// </summary>
         public M6502()
         {
             IgnorePropagation(true);
@@ -152,333 +229,333 @@ namespace Poly6502.Microprocessor
             OpCodeLookupTable = new Dictionary<byte, Operation>()
             {
                 /* 0 Row */
-                {0x00, new Operation(BRK, IMP)},
-                {0x01, new Operation(ORA, IZX)},
-                {0x05, new Operation(ORA, ZPA)},
-                {0x06, new Operation(ASL, ZPA)},
-                {0x08, new Operation(PHP, IMP)},
-                {0x09, new Operation(ORA, IMM)},
-                {0x0A, new Operation(ASL, ACC)},
-                {0x0D, new Operation(ORA, ABS)},
-                {0x0E, new Operation(ASL, ABS)},
+                {0x00, new Operation(BRK, IMP, 1, 7)},
+                {0x01, new Operation(ORA, IZX, 2, 6)},
+                {0x05, new Operation(ORA, ZPA, 2, 3)},
+                {0x06, new Operation(ASL, ZPA, 2, 5)},
+                {0x08, new Operation(PHP, IMP, 1, 3)},
+                {0x09, new Operation(ORA, IMM, 2, 2)},
+                {0x0A, new Operation(ASL, ACC, 1,2)},
+                {0x0D, new Operation(ORA, ABS, 3,4)},
+                {0x0E, new Operation(ASL, ABS, 3,6)},
 
                 /* 1 Row */
-                {0x10, new Operation(BPL, REL)},
-                {0x11, new Operation(ORA, IZY)},
-                {0x15, new Operation(ORA, ZPX)},
-                {0x16, new Operation(ASL, ZPX)},
-                {0x18, new Operation(CLC, IMP)},
-                {0x19, new Operation(ORA, ABY)},
-                {0x1D, new Operation(ORA, ABX)},
-                {0x1E, new Operation(ASL, ABX)},
+                {0x10, new Operation(BPL, REL, 2,2)},
+                {0x11, new Operation(ORA, IZY, 2,5)},
+                {0x15, new Operation(ORA, ZPX, 2,4)},
+                {0x16, new Operation(ASL, ZPX, 2,6)},
+                {0x18, new Operation(CLC, IMP, 1,2)},
+                {0x19, new Operation(ORA, ABY, 3,4)},
+                {0x1D, new Operation(ORA, ABX, 3,4)},
+                {0x1E, new Operation(ASL, ABX, 3,7)},
 
                 /* 2 Row */
-                {0x20, new Operation(JSR, ABS)},
-                {0x21, new Operation(AND, IZX)},
-                {0x24, new Operation(BIT, ZPA)},
-                {0x25, new Operation(AND, ZPA)},
-                {0x26, new Operation(ROL, ZPA)},
-                {0x28, new Operation(PLP, IMP)},
-                {0x29, new Operation(AND, IMM)},
-                {0x2A, new Operation(ROL, ACC)},
-                {0x2C, new Operation(BIT, ABS)},
-                {0x2D, new Operation(AND, ABS)},
-                {0x2E, new Operation(ROL, ABS)},
+                {0x20, new Operation(JSR, ABS, 3,6)},
+                {0x21, new Operation(AND, IZX, 2,6)},
+                {0x24, new Operation(BIT, ZPA, 2,3)},
+                {0x25, new Operation(AND, ZPA, 2,3)},
+                {0x26, new Operation(ROL, ZPA, 2,5)},
+                {0x28, new Operation(PLP, IMP, 1,4)},
+                {0x29, new Operation(AND, IMM, 2,2)},
+                {0x2A, new Operation(ROL, ACC, 1,2)},
+                {0x2C, new Operation(BIT, ABS, 3,4)},
+                {0x2D, new Operation(AND, ABS, 3,4)},
+                {0x2E, new Operation(ROL, ABS, 3,6)},
 
                 /* 3 Row */
-                {0x30, new Operation(BMI, REL)},
-                {0x31, new Operation(AND, IZY)},
-                {0x35, new Operation(AND, ZPX)},
-                {0x36, new Operation(ROL, ZPX)},
-                {0x38, new Operation(SEC, IMP)},
-                {0x39, new Operation(AND, ABY)},
-                {0x3D, new Operation(AND, ABX)},
-                {0x3E, new Operation(ROL, ABX)},
+                {0x30, new Operation(BMI, REL, 2,2)},
+                {0x31, new Operation(AND, IZY, 2,5)},
+                {0x35, new Operation(AND, ZPX, 2,4)},
+                {0x36, new Operation(ROL, ZPX, 2,6)},
+                {0x38, new Operation(SEC, IMP, 1,2)},
+                {0x39, new Operation(AND, ABY, 3,4)},
+                {0x3D, new Operation(AND, ABX, 3,4)},
+                {0x3E, new Operation(ROL, ABX, 3,7)},
 
                 /* 4 Row */
-                {0x40, new Operation(RTI, IMP)},
-                {0x41, new Operation(EOR, IZX)},
-                {0x45, new Operation(EOR, ZPA)},
-                {0x46, new Operation(LSR, ZPA)},
-                {0x48, new Operation(PHA, IMP)},
-                {0x49, new Operation(EOR, IMM)},
-                {0x4A, new Operation(LSR, ACC)},
-                {0x4C, new Operation(JMP, ABS)},
-                {0x4D, new Operation(EOR, ABS)},
-                {0x4E, new Operation(LSR, ABS)},
+                {0x40, new Operation(RTI, IMP, 1,6)},
+                {0x41, new Operation(EOR, IZX, 2,6)},
+                {0x45, new Operation(EOR, ZPA, 2,3)},
+                {0x46, new Operation(LSR, ZPA, 2,5)},
+                {0x48, new Operation(PHA, IMP, 1,3)},
+                {0x49, new Operation(EOR, IMM, 2,2)},
+                {0x4A, new Operation(LSR, ACC, 1,2)},
+                {0x4C, new Operation(JMP, ABS, 3,3)},
+                {0x4D, new Operation(EOR, ABS, 3,4)},
+                {0x4E, new Operation(LSR, ABS, 3,6)},
 
                 /* 5 Row */
-                {0x50, new Operation(BVC, REL)},
-                {0x51, new Operation(EOR, IZY)},
-                {0x55, new Operation(EOR, ZPX)},
-                {0x56, new Operation(LSR, ZPX)},
-                {0x58, new Operation(CLI, IMP)},
-                {0x59, new Operation(EOR, ABY)},
-                {0x5D, new Operation(EOR, ABX)},
-                {0x5E, new Operation(LSR, ABX)},
+                {0x50, new Operation(BVC, REL, 2,2)},
+                {0x51, new Operation(EOR, IZY, 2,5)},
+                {0x55, new Operation(EOR, ZPX, 2,4)},
+                {0x56, new Operation(LSR, ZPX, 2,6)},
+                {0x58, new Operation(CLI, IMP, 1,2)},
+                {0x59, new Operation(EOR, ABY, 3,4)},
+                {0x5D, new Operation(EOR, ABX, 3,4)},
+                {0x5E, new Operation(LSR, ABX, 3,7)},
 
                 /* 6 Row */
-                {0x60, new Operation(RTS, IMP)},
-                {0x61, new Operation(ADC, IZX)},
-                {0x65, new Operation(ADC, ZPA)},
-                {0x66, new Operation(ROR, ZPA)},
-                {0x68, new Operation(PLA, IMP)},
-                {0x69, new Operation(ADC, IMM)},
-                {0x6A, new Operation(ROR, ACC)},
-                {0x6C, new Operation(JMP, IND)},
-                {0x6D, new Operation(ADC, ABS)},
-                {0x6E, new Operation(ROR, ABS)},
+                {0x60, new Operation(RTS, IMP, 1,6)},
+                {0x61, new Operation(ADC, IZX, 2,6)},
+                {0x65, new Operation(ADC, ZPA, 2,3)},
+                {0x66, new Operation(ROR, ZPA, 2,5)},
+                {0x68, new Operation(PLA, IMP, 1,4)},
+                {0x69, new Operation(ADC, IMM, 2,2)},
+                {0x6A, new Operation(ROR, ACC, 1,2)},
+                {0x6C, new Operation(JMP, IND, 3,5)},
+                {0x6D, new Operation(ADC, ABS, 3,4)},
+                {0x6E, new Operation(ROR, ABS, 3,6)},
 
                 /* 7 Row */
-                {0x70, new Operation(BVS, REL)},
-                {0x71, new Operation(ADC, IZY)},
-                {0x75, new Operation(ADC, ZPX)},
-                {0x76, new Operation(ROR, ZPX)},
-                {0x78, new Operation(SEI, IMP)},
-                {0x79, new Operation(ADC, ABY)},
-                {0x7D, new Operation(ADC, ABX)},
-                {0x7E, new Operation(ROR, ABX)},
+                {0x70, new Operation(BVS, REL, 2,2)},
+                {0x71, new Operation(ADC, IZY, 2,5)},
+                {0x75, new Operation(ADC, ZPX, 2,4)},
+                {0x76, new Operation(ROR, ZPX, 2,6)},
+                {0x78, new Operation(SEI, IMP, 1,2)},
+                {0x79, new Operation(ADC, ABY, 3,4)},
+                {0x7D, new Operation(ADC, ABX, 3,4)},
+                {0x7E, new Operation(ROR, ABX, 3,7)},
 
                 /* 8 Row */
-                {0x81, new Operation(STA, IZX)},
-                {0x84, new Operation(STY, ZPA)},
-                {0x85, new Operation(STA, ZPA)},
-                {0x86, new Operation(STX, ZPA)},
-                {0x88, new Operation(DEY, IMP)},
-                {0x8A, new Operation(TXA, IMP)},
-                {0x8C, new Operation(STY, ABS)},
-                {0x8D, new Operation(STA, ABS)},
-                {0x8E, new Operation(STX, ABS)},
+                {0x81, new Operation(STA, IZX, 2,6)},
+                {0x84, new Operation(STY, ZPA, 2,3)},
+                {0x85, new Operation(STA, ZPA, 2,3)},
+                {0x86, new Operation(STX, ZPA, 2,3)},
+                {0x88, new Operation(DEY, IMP, 1,2)},
+                {0x8A, new Operation(TXA, IMP, 1,2)},
+                {0x8C, new Operation(STY, ABS, 3,4)},
+                {0x8D, new Operation(STA, ABS, 3,4)},
+                {0x8E, new Operation(STX, ABS, 3,4)},
 
                 /* 9 Row */
-                {0x90, new Operation(BCC, REL)},
-                {0x91, new Operation(STA, IZY)},
-                {0x94, new Operation(STY, ZPX)},
-                {0x95, new Operation(STA, ZPX)},
-                {0x96, new Operation(STX, ZPY)},
-                {0x98, new Operation(TYA, IMP)},
-                {0x99, new Operation(STA, ABY)},
-                {0x9A, new Operation(TXS, IMP)},
-                {0x9D, new Operation(STA, ABX)},
+                {0x90, new Operation(BCC, REL, 2,2)},
+                {0x91, new Operation(STA, IZY, 2,6)},
+                {0x94, new Operation(STY, ZPX, 2,4)},
+                {0x95, new Operation(STA, ZPX, 2,4)},
+                {0x96, new Operation(STX, ZPY, 2,4)},
+                {0x98, new Operation(TYA, IMP, 1,2)},
+                {0x99, new Operation(STA, ABY, 3,5)},
+                {0x9A, new Operation(TXS, IMP, 1,2)},
+                {0x9D, new Operation(STA, ABX, 3,5)},
 
                 /* A Row */
-                {0xA0, new Operation(LDY, IMM)},
-                {0xA1, new Operation(LDA, IZX)},
-                {0xA2, new Operation(LDX, IMM)},
-                {0xA4, new Operation(LDY, ZPA)},
-                {0xA5, new Operation(LDA, ZPA)},
-                {0xA6, new Operation(LDX, ZPA)},
-                {0xA8, new Operation(TAY, IMP)},
-                {0xA9, new Operation(LDA, IMM)},
-                {0xAA, new Operation(TAX, IMP)},
-                {0xAC, new Operation(LDY, ABS)},
-                {0xAD, new Operation(LDA, ABS)},
-                {0xAE, new Operation(LDX, ABS)},
+                {0xA0, new Operation(LDY, IMM, 2,2)},
+                {0xA1, new Operation(LDA, IZX, 2,6)},
+                {0xA2, new Operation(LDX, IMM, 2,2)},
+                {0xA4, new Operation(LDY, ZPA, 2,3)},
+                {0xA5, new Operation(LDA, ZPA, 2,3)},
+                {0xA6, new Operation(LDX, ZPA, 2,3)},
+                {0xA8, new Operation(TAY, IMP, 1,2)},
+                {0xA9, new Operation(LDA, IMM, 2,2)},
+                {0xAA, new Operation(TAX, IMP, 1,2)},
+                {0xAC, new Operation(LDY, ABS, 3,4)},
+                {0xAD, new Operation(LDA, ABS, 3,4)},
+                {0xAE, new Operation(LDX, ABS, 3,4)},
 
                 /* B Row */
-                {0xB0, new Operation(BCS, REL)},
-                {0xB1, new Operation(LDA, IZY)},
-                {0xB4, new Operation(LDY, ZPX)},
-                {0xB5, new Operation(LDA, ZPX)},
-                {0xB6, new Operation(LDX, ZPY)},
-                {0xB8, new Operation(CLV, IMP)},
-                {0xB9, new Operation(LDA, ABY)},
-                {0xBA, new Operation(TSX, IMP)},
-                {0xBC, new Operation(LDY, ABX)},
-                {0xBD, new Operation(LDA, ABX)},
-                {0xBE, new Operation(LDX, ABY)},
+                {0xB0, new Operation(BCS, REL, 2,2)},
+                {0xB1, new Operation(LDA, IZY, 2,5)},
+                {0xB4, new Operation(LDY, ZPX, 2,4)},
+                {0xB5, new Operation(LDA, ZPX, 2,4)},
+                {0xB6, new Operation(LDX, ZPY, 2,4)},
+                {0xB8, new Operation(CLV, IMP, 1,2)},
+                {0xB9, new Operation(LDA, ABY, 3,4)},
+                {0xBA, new Operation(TSX, IMP, 1,2)},
+                {0xBC, new Operation(LDY, ABX, 3,4)},
+                {0xBD, new Operation(LDA, ABX, 3,4)},
+                {0xBE, new Operation(LDX, ABY, 3,4)},
 
                 /* C Row */
-                {0xC0, new Operation(CPY, IMM)},
-                {0xC1, new Operation(CMP, IZX)},
-                {0xC4, new Operation(CPY, ZPA)},
-                {0xC5, new Operation(CMP, ZPA)},
-                {0xC6, new Operation(DEC, ZPA)},
-                {0xC8, new Operation(INY, IMP)},
-                {0xC9, new Operation(CMP, IMM)},
-                {0xCA, new Operation(DEX, IMP)},
-                {0xCC, new Operation(CPY, ABS)},
-                {0xCD, new Operation(CMP, ABS)},
-                {0xCE, new Operation(DEC, ABS)},
+                {0xC0, new Operation(CPY, IMM, 2,2)},
+                {0xC1, new Operation(CMP, IZX, 2,6)},
+                {0xC4, new Operation(CPY, ZPA, 2,3)},
+                {0xC5, new Operation(CMP, ZPA, 2,3)},
+                {0xC6, new Operation(DEC, ZPA, 2,5)},
+                {0xC8, new Operation(INY, IMP, 1,2)},
+                {0xC9, new Operation(CMP, IMM, 2,2)},
+                {0xCA, new Operation(DEX, IMP, 1,2)},
+                {0xCC, new Operation(CPY, ABS, 3,4)},
+                {0xCD, new Operation(CMP, ABS, 3,4)},
+                {0xCE, new Operation(DEC, ABS, 3,6)},
 
                 /* D Row */
-                {0xD0, new Operation(BNE, REL)},
-                {0xD1, new Operation(CMP, IZY)},
-                {0xD5, new Operation(CMP, ZPX)},
-                {0xD6, new Operation(DEC, ZPX)},
-                {0xD8, new Operation(CLD, IMP)},
-                {0xD9, new Operation(CMP, ABY)},
-                {0xDD, new Operation(CMP, ABX)},
-                {0xDE, new Operation(DEC, ABX)},
+                {0xD0, new Operation(BNE, REL, 2,2)},
+                {0xD1, new Operation(CMP, IZY, 2,5)},
+                {0xD5, new Operation(CMP, ZPX, 2,4)},
+                {0xD6, new Operation(DEC, ZPX, 2,6)},
+                {0xD8, new Operation(CLD, IMP, 1,2)},
+                {0xD9, new Operation(CMP, ABY, 3,4)},
+                {0xDD, new Operation(CMP, ABX, 3,4)},
+                {0xDE, new Operation(DEC, ABX, 3,7)},
 
                 /* E Row */
-                {0xE0, new Operation(CPX, IMM)},
-                {0xE1, new Operation(SBC, IZX)},
-                {0xE4, new Operation(CPX, ZPA)},
-                {0xE5, new Operation(SBC, ZPA)},
-                {0xE6, new Operation(INC, ZPA)},
-                {0xE8, new Operation(INX, IMP)},
-                {0xE9, new Operation(SBC, IMM)},
-                {0xEA, new Operation(NOP, IMP)},
-                {0xEC, new Operation(CPX, ABS)},
-                {0xED, new Operation(SBC, ABS)},
-                {0xEE, new Operation(INC, ABS)},
+                {0xE0, new Operation(CPX, IMM, 2,2)},
+                {0xE1, new Operation(SBC, IZX, 2,6)},
+                {0xE4, new Operation(CPX, ZPA, 2,3)},
+                {0xE5, new Operation(SBC, ZPA, 2,3)},
+                {0xE6, new Operation(INC, ZPA, 2,5)},
+                {0xE8, new Operation(INX, IMP, 1,2)},
+                {0xE9, new Operation(SBC, IMM, 2,2)},
+                {0xEA, new Operation(NOP, IMP, 1,2)},
+                {0xEC, new Operation(CPX, ABS, 3,4)},
+                {0xED, new Operation(SBC, ABS, 3,4)},
+                {0xEE, new Operation(INC, ABS, 3,6)},
 
                 /* F Row */
-                {0xF0, new Operation(BEQ, REL)},
-                {0xF1, new Operation(SBC, IZY)},
-                {0xF5, new Operation(SBC, ZPX)},
-                {0xF6, new Operation(INC, ZPX)},
-                {0xF8, new Operation(SED, IMP)},
-                {0xF9, new Operation(SBC, ABY)},
-                {0xFD, new Operation(SBC, ABX)},
-                {0xFE, new Operation(INC, ABX)},
+                {0xF0, new Operation(BEQ, REL, 2,2)},
+                {0xF1, new Operation(SBC, IZY, 2,5)},
+                {0xF5, new Operation(SBC, ZPX, 2,4)},
+                {0xF6, new Operation(INC, ZPX, 2,6)},
+                {0xF8, new Operation(SED, IMP, 1,2)},
+                {0xF9, new Operation(SBC, ABY, 3,4)},
+                {0xFD, new Operation(SBC, ABX, 3,4)},
+                {0xFE, new Operation(INC, ABX, 3,7)},
 
                 /* NOP Illegal OpCodes */
-                {0x1A, new Operation(NOP, IMP)},
-                {0x3A, new Operation(NOP, IMP)},
-                {0x5A, new Operation(NOP, IMP)},
-                {0x7A, new Operation(NOP, IMP)},
-                {0xDA, new Operation(NOP, IMP)},
-                {0xFA, new Operation(NOP, IMP)},
-                {0x80, new Operation(NOP, IMM)},
-                {0x82, new Operation(NOP, IMM)},
-                {0x89, new Operation(NOP, IMM)},
-                {0xC2, new Operation(NOP, IMM)},
-                {0xE2, new Operation(NOP, IMM)},
-                {0x04, new Operation(NOP, ZPA)},
-                {0x44, new Operation(NOP, ZPA)},
-                {0x64, new Operation(NOP, ZPA)},
-                {0x14, new Operation(NOP, ZPX)},
-                {0x34, new Operation(NOP, ZPX)},
-                {0x54, new Operation(NOP, ZPX)},
-                {0x74, new Operation(NOP, ZPX)},
-                {0xD4, new Operation(NOP, ZPX)},
-                {0xF4, new Operation(NOP, ZPX)},
-                {0x0C, new Operation(NOP, ABS)},
-                {0x1C, new Operation(NOP, ABX)},
-                {0x3C, new Operation(NOP, ABX)},
-                {0x5C, new Operation(NOP, ABX)},
-                {0x7C, new Operation(NOP, ABX)},
-                {0xDC, new Operation(NOP, ABX)},
-                {0xFC, new Operation(NOP, ABX)},
+                {0x1A, new Operation(NOP, IMP, 1,2)},
+                {0x3A, new Operation(NOP, IMP, 1,2)},
+                {0x5A, new Operation(NOP, IMP, 1,2)},
+                {0x7A, new Operation(NOP, IMP, 1,2)},
+                {0xDA, new Operation(NOP, IMP, 1,2)},
+                {0xFA, new Operation(NOP, IMP, 1,2)},
+                {0x80, new Operation(NOP, IMM, 2,2)},
+                {0x82, new Operation(NOP, IMM, 2,2)},
+                {0x89, new Operation(NOP, IMM, 2,2)},
+                {0xC2, new Operation(NOP, IMM, 2,2)},
+                {0xE2, new Operation(NOP, IMM, 2,2)},
+                {0x04, new Operation(NOP, ZPA, 2,3)},
+                {0x44, new Operation(NOP, ZPA, 2,3)},
+                {0x64, new Operation(NOP, ZPA, 2,3)},
+                {0x14, new Operation(NOP, ZPX, 2,4)},
+                {0x34, new Operation(NOP, ZPX, 2,4)},
+                {0x54, new Operation(NOP, ZPX, 2,4)},
+                {0x74, new Operation(NOP, ZPX, 2,4)},
+                {0xD4, new Operation(NOP, ZPX, 2,4)},
+                {0xF4, new Operation(NOP, ZPX, 2,4)},
+                {0x0C, new Operation(NOP, ABS, 3,4)},
+                {0x1C, new Operation(NOP, ABX, 3,4)},
+                {0x3C, new Operation(NOP, ABX, 3,4)},
+                {0x5C, new Operation(NOP, ABX, 3,4)},
+                {0x7C, new Operation(NOP, ABX, 3,4)},
+                {0xDC, new Operation(NOP, ABX, 3,4)},
+                {0xFC, new Operation(NOP, ABX, 3,4)},
 
                 /* LAX Illegal OpCodes */
-                {0xA7, new Operation(LAX, ZPA)},
-                {0xB7, new Operation(LAX, ZPY)},
-                {0xAF, new Operation(LAX, ABS)},
-                {0xBF, new Operation(LAX, ABY)},
-                {0xA3, new Operation(LAX, IZX)},
-                {0xB3, new Operation(LAX, IZY)},
+                {0xA7, new Operation(LAX, ZPA, 2,3)},
+                {0xB7, new Operation(LAX, ZPY, 2,4)},
+                {0xAF, new Operation(LAX, ABS, 3,4)},
+                {0xBF, new Operation(LAX, ABY, 3,4)},
+                {0xA3, new Operation(LAX, IZX, 2,6)},
+                {0xB3, new Operation(LAX, IZY, 2,5)},
 
                 /* SAX Illegal Opcodes */
-                {0x87, new Operation(SAX, ZPA)},
-                {0x97, new Operation(SAX, ZPY)},
-                {0x8F, new Operation(SAX, ABS)},
-                {0x83, new Operation(SAX, IZX)},
+                {0x87, new Operation(SAX, ZPA, 2,3)},
+                {0x97, new Operation(SAX, ZPY, 2,4)},
+                {0x8F, new Operation(SAX, ABS, 3,4)},
+                {0x83, new Operation(SAX, IZX, 2,6)},
 
                 /* USBC Illegal OpCodes */
-                {0xEB, new Operation(SBC, IMM)},
+                {0xEB, new Operation(SBC, IMM, 2,2)},
 
                 /* DCP Illegal OpCodes */
-                {0xC7, new Operation(DCP, ZPA)},
-                {0xD7, new Operation(DCP, ZPX)},
-                {0xCF, new Operation(DCP, ABS)},
-                {0xDF, new Operation(DCP, ABX)},
-                {0xDB, new Operation(DCP, ABY)},
-                {0xC3, new Operation(DCP, IZX)},
-                {0xD3, new Operation(DCP, IZY)},
+                {0xC7, new Operation(DCP, ZPA, 2,5)},
+                {0xD7, new Operation(DCP, ZPX, 2,6)},
+                {0xCF, new Operation(DCP, ABS, 3,6)},
+                {0xDF, new Operation(DCP, ABX, 3,7)},
+                {0xDB, new Operation(DCP, ABY, 3,7)},
+                {0xC3, new Operation(DCP, IZX, 2,8)},
+                {0xD3, new Operation(DCP, IZY, 2,8)},
 
                 /* ISC Illegal OpCodes */
-                {0xE7, new Operation(ISC, ZPA)},
-                {0xF7, new Operation(ISC, ZPX)},
-                {0xEF, new Operation(ISC, ABS)},
-                {0xFF, new Operation(ISC, ABX)},
-                {0xFB, new Operation(ISC, ABY)},
-                {0xE3, new Operation(ISC, IZX)},
-                {0xF3, new Operation(ISC, IZY)},
+                {0xE7, new Operation(ISC, ZPA, 2,5)},
+                {0xF7, new Operation(ISC, ZPX, 2,6)},
+                {0xEF, new Operation(ISC, ABS, 3,6)},
+                {0xFF, new Operation(ISC, ABX, 3,7)},
+                {0xFB, new Operation(ISC, ABY, 3,7)},
+                {0xE3, new Operation(ISC, IZX, 2,8)},
+                {0xF3, new Operation(ISC, IZY, 2,4)},
 
                 /* SLO Illegal OpCodes */
-                {0x07, new Operation(SLO, ZPA)},
-                {0x17, new Operation(SLO, ZPX)},
-                {0x0F, new Operation(SLO, ABS)},
-                {0x1F, new Operation(SLO, ABX)},
-                {0x1B, new Operation(SLO, ABY)},
-                {0x03, new Operation(SLO, IZX)},
-                {0x13, new Operation(SLO, IZY)},
+                {0x07, new Operation(SLO, ZPA, 2,5)},
+                {0x17, new Operation(SLO, ZPX, 2,6)},
+                {0x0F, new Operation(SLO, ABS, 3,6)},
+                {0x1F, new Operation(SLO, ABX, 3,7)},
+                {0x1B, new Operation(SLO, ABY, 3,7)},
+                {0x03, new Operation(SLO, IZX, 2,8)},
+                {0x13, new Operation(SLO, IZY, 2,8)},
 
                 /* RLA Illegal OpCodes */
-                {0x27, new Operation(RLA, ZPA)},
-                {0x37, new Operation(RLA, ZPX)},
-                {0x2F, new Operation(RLA, ABS)},
-                {0x3F, new Operation(RLA, ABX)},
-                {0x3B, new Operation(RLA, ABY)},
-                {0x23, new Operation(RLA, IZX)},
-                {0x33, new Operation(RLA, IZY)},
+                {0x27, new Operation(RLA, ZPA, 2,5)},
+                {0x37, new Operation(RLA, ZPX, 2,6)},
+                {0x2F, new Operation(RLA, ABS, 3,6)},
+                {0x3F, new Operation(RLA, ABX, 3,7)},
+                {0x3B, new Operation(RLA, ABY, 3,7)},
+                {0x23, new Operation(RLA, IZX, 2,8)},
+                {0x33, new Operation(RLA, IZY, 2,8)},
 
                 /* SRE Illegal OpCodes */
-                {0x47, new Operation(SRE, ZPA)},
-                {0x57, new Operation(SRE, ZPX)},
-                {0x4F, new Operation(SRE, ABS)},
-                {0x5F, new Operation(SRE, ABX)},
-                {0x5B, new Operation(SRE, ABY)},
-                {0x43, new Operation(SRE, IZX)},
-                {0x53, new Operation(SRE, IZY)},
+                {0x47, new Operation(SRE, ZPA, 2,5)},
+                {0x57, new Operation(SRE, ZPX, 2,6)},
+                {0x4F, new Operation(SRE, ABS, 3,6)},
+                {0x5F, new Operation(SRE, ABX, 3,7)},
+                {0x5B, new Operation(SRE, ABY, 3,7)},
+                {0x43, new Operation(SRE, IZX, 2,8)},
+                {0x53, new Operation(SRE, IZY, 2,8)},
 
-                /* SRE Illegal OpCodes */
-                {0x67, new Operation(RRA, ZPA)},
-                {0x77, new Operation(RRA, ZPX)},
-                {0x6F, new Operation(RRA, ABS)},
-                {0x7F, new Operation(RRA, ABX)},
-                {0x7B, new Operation(RRA, ABY)},
-                {0x63, new Operation(RRA, IZX)},
-                {0x73, new Operation(RRA, IZY)},
+                /* RRA Illegal OpCodes */
+                {0x67, new Operation(RRA, ZPA, 2,5)},
+                {0x77, new Operation(RRA, ZPX, 2,6)},
+                {0x6F, new Operation(RRA, ABS, 3,6)},
+                {0x7F, new Operation(RRA, ABX, 3,7)},
+                {0x7B, new Operation(RRA, ABY, 3,7)},
+                {0x63, new Operation(RRA, IZX, 2,8)},
+                {0x73, new Operation(RRA, IZY, 2,8)},
 
                 /* JAM Illegal Opcodes */
-                {0x02, new Operation(JAM, IMP)},
-                {0x12, new Operation(JAM, IMP)},
-                {0x22, new Operation(JAM, IMP)},
-                {0x32, new Operation(JAM, IMP)},
-                {0x42, new Operation(JAM, IMP)},
-                {0x52, new Operation(JAM, IMP)},
-                {0x62, new Operation(JAM, IMP)},
-                {0x72, new Operation(JAM, IMP)},
-                {0x92, new Operation(JAM, IMP)},
-                {0xB2, new Operation(JAM, IMP)},
-                {0xD2, new Operation(JAM, IMP)},
-                {0xF2, new Operation(JAM, IMP)},
+                {0x02, new Operation(JAM, IMP, 1,2)},
+                {0x12, new Operation(JAM, IMP, 1,2)},
+                {0x22, new Operation(JAM, IMP, 1,2)},
+                {0x32, new Operation(JAM, IMP, 1,2)},
+                {0x42, new Operation(JAM, IMP, 1,2)},
+                {0x52, new Operation(JAM, IMP, 1,2)},
+                {0x62, new Operation(JAM, IMP, 1,2)},
+                {0x72, new Operation(JAM, IMP, 1,2)},
+                {0x92, new Operation(JAM, IMP, 1,2)},
+                {0xB2, new Operation(JAM, IMP, 1,2)},
+                {0xD2, new Operation(JAM, IMP, 1,2)},
+                {0xF2, new Operation(JAM, IMP, 1,2)},
 
                 /* ANC Illegal Opcodes */
-                {0x0B, new Operation(ANC, IMM)},
-                {0x2B, new Operation(ANC, IMM)},
+                {0x0B, new Operation(ANC, IMM, 2, 2)},
+                {0x2B, new Operation(ANC2, IMM,  2,2)},
 
                 /* ALR Illegal Opcodes */
-                {0x4B, new Operation(ALR, IMM)},
+                {0x4B, new Operation(ALR, IMM,  2,2)},
 
                 /* ARR Illegal Opcodes */
-                {0x6B, new Operation(ARR, IMM)},
+                {0x6B, new Operation(ARR, IMM,  2,2)},
 
                 /* ANE Illegal Opcodes*/
-                {0x8B, new Operation(ANE, IMM)},
+                {0x8B, new Operation(ANE, IMM,  2,2)},
 
                 /* SHA Illegal Opcodes */
-                {0x9F, new Operation(SHA, ABY)},
-                {0x93, new Operation(SHA, IZY)},
+                {0x9F, new Operation(SHA, ABY, 3,5)},
+                {0x93, new Operation(SHA, IZY, 2,6)},
 
                 /* TAS Illegal Opcodes */
-                {0x9B, new Operation(TAS, ABY)},
+                {0x9B, new Operation(TAS, ABY,  3,5)},
 
                 /* SHY Illegal Opcodes */
-                {0x9C, new Operation(SHY, ABX)},
+                {0x9C, new Operation(SHY, ABX,  3,5)},
 
                 /* SHX Illegal Opcodes */
-                {0x9E, new Operation(SHX, ABY)},
+                {0x9E, new Operation(SHX, ABY,  3,5)},
 
                 /* LXA Illegal Opcodes */
-                {0xAB, new Operation(LXA, IMM)},
+                {0xAB, new Operation(LXA, IMM,  2,2)},
 
                 /* LAS Illegal Opcodes */
-                {0xBB, new Operation(LAS, ABY)},
+                {0xBB, new Operation(LAS, ABY,  3,4)},
             };
 
             AddressChanged += (sender, args) =>
@@ -497,15 +574,6 @@ namespace Poly6502.Microprocessor
 
 
         #region Addressing Modes
-
-        /*
-         * http://www.emulator101.com/6502-addressing-modes.html :
-         *
-         * When the 6502 refers to addressing modes, it really means "What is the source of the data used in this instruction?" 
-         * The 6502's data book divides the addressing modes into 2 groups, indexed and non-indexed.
-         * 
-         */
-
 
         /// <summary>
         /// Accumulator Addressing
@@ -527,6 +595,7 @@ namespace Poly6502.Microprocessor
         public void IMP()
         {
             AddressingModeInProgress = false;
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -1021,6 +1090,34 @@ namespace Poly6502.Microprocessor
         /// AND operation + set C as ASL
         /// </summary>
         public void ANC()
+        {
+            BeginOpCode();
+
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte) (A & DataBusData);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.C, P.HasFlag(StatusRegisterFlags.N));
+                    AddressBusAddress++;
+                    break;
+                }
+                case (2):
+                {
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+
+        public void ANC2()
         {
             BeginOpCode();
 
@@ -3563,6 +3660,7 @@ namespace Poly6502.Microprocessor
                 {
                     SP = X;
                     AddressBusAddress++;
+                    _instructionCycles++;
                     EndOpCode();
                     break;
                 }
@@ -3587,7 +3685,7 @@ namespace Poly6502.Microprocessor
                     A = Y;
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
-
+                    _instructionCycles++;
                     AddressBusAddress++;
                     EndOpCode();
                     break;
@@ -3627,7 +3725,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
                     AddressBusAddress++;
-
+                    _instructionCycles++;
                     EndOpCode();
                     break;
                 }
@@ -3665,6 +3763,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
                     AddressBusAddress++;
+                    _instructionCycles++;
                     EndOpCode();
                     break;
                 }
@@ -4013,7 +4112,7 @@ namespace Poly6502.Microprocessor
             throw new NotImplementedException();
         }
 
-        public override byte Read(ushort address)
+        public override byte Read(ushort address, bool ronly = false)
         {
             throw new NotImplementedException();
         }
@@ -4103,8 +4202,8 @@ namespace Poly6502.Microprocessor
                     InstructionLoByte = kvp.Value.Read(0xFFFC);
                     InstructionHiByte = kvp.Value.Read(0xFFFD);
 
-                    PC = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    AddressBusAddress = PC;
+                    Pc = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
+                    AddressBusAddress = Pc;
                 }
             }
         }
@@ -4120,7 +4219,7 @@ namespace Poly6502.Microprocessor
             
             SP = 0xFD;
             AddressBusAddress = 0x0000;
-            PC = AddressBusAddress;
+            Pc = AddressBusAddress;
             AddressingModeInProgress = true;
             FetchInstruction = true;
             CpuRead = true;
@@ -4131,7 +4230,7 @@ namespace Poly6502.Microprocessor
                 ProgramCounterInitialisation();
             else
             {
-                PC = address;
+                Pc = address;
                 AddressBusAddress = address;
             }
             

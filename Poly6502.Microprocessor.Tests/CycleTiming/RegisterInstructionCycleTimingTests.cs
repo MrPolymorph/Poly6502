@@ -77,22 +77,14 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
             Operation op = _m6502.OpCodeLookupTable[opcode];
             
             
-            _m6502.PC = 0xC000;
+            _m6502.Pc = 0xC000;
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>()))
+            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                 .Returns(opcode)
                 .Returns(0x05);
             
             
-            do
-            {
-                _m6502.Fetch();
-            } while (_m6502.AddressingModeInProgress);
 
-            do
-            {
-                _m6502.Execute();
-            } while (_m6502.OpCodeInProgress);
             
         }
     }

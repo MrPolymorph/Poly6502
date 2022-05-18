@@ -20,7 +20,7 @@ namespace Poly6502.Interfaces
 
         void PropagationOverride(bool ovr, object invoker);
 
-        byte Read(ushort address);
+        byte Read(ushort address, bool ronly = false);
         void Write(ushort address, byte data);
     }
 }

@@ -20,14 +20,14 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
             _truthData = new List<CycleTruthData>()
             {
                 /* ADC */
-                /* Immediate */   new CycleTruthData(0xC9, 2),
-                /* Zero Page */   new CycleTruthData(0xC5, 3),
-                /* Zero Page X */ new CycleTruthData(0xD5, 4),
-                /* Absolute */    new CycleTruthData(0xCD, 4),
-                /* Absolute X */  new CycleTruthData(0xDD, 4, true),
-                /* Absolute Y */  new CycleTruthData(0xD9, 4, true),
-                /* Indirect X */  new CycleTruthData(0xC1, 6),
-                /* Indirect Y */  new CycleTruthData(0xD1, 5, true),
+                /* Immediate */   new(0xC9, 2),
+                /* Zero Page */   new(0xC5, 3),
+                /* Zero Page X */ new(0xD5, 4),
+                /* Absolute */    new(0xCD, 4),
+                /* Absolute X */  new(0xDD, 4, true),
+                /* Absolute Y */  new(0xD9, 4, true),
+                /* Indirect X */  new(0xC1, 6),
+                /* Indirect Y */  new(0xD1, 5, true),
                 
             };
         }
@@ -78,22 +78,14 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
 
             Assert.IsTrue(op.OpCodeCompare(_m6502.CMP));
             
-            _m6502.PC = 0xC000;
+            _m6502.Pc = 0xC000;
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>()))
+            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                 .Returns(opcode)
                 .Returns(0x05);
             
             
-            do
-            {
-                _m6502.Fetch();
-            } while (_m6502.AddressingModeInProgress);
 
-            do
-            {
-                _m6502.Execute();
-            } while (_m6502.OpCodeInProgress);
             
         }
     }

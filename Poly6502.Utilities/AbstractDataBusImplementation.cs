@@ -52,7 +52,7 @@ namespace Poly6502.Utilities
             }
         }
 
-        public byte Read(ushort address)
+        public byte Read(ushort address, bool ronly = false)
         {
             throw new NotImplementedException();
         }

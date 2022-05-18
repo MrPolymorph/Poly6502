@@ -46,15 +46,17 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
 
                 Assert.IsTrue(op.OpCodeCompare(_m6502.BRK));
 
-                _m6502.PC = 0xC000;
+                _m6502.Pc = 0xC000;
 
-                _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>()))
+                _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                     .Returns(truth.OpCode)
                     .Returns(0x05);
                 
+                _m6502.Fetch();
+                
                 do
                 {
-                    _m6502.Fetch();
+                    _m6502.Execute();
                 } while (_m6502.AddressingModeInProgress);
 
                 do

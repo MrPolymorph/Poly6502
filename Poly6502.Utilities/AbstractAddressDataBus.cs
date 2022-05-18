@@ -165,7 +165,7 @@ namespace Poly6502.Utilities
             }
         }
 
-        public abstract byte Read(ushort address);
+        public abstract byte Read(ushort address, bool ronly = false);
         public abstract void Write(ushort address, byte data);
 
 

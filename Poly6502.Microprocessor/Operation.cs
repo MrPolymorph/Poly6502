@@ -6,11 +6,14 @@ namespace Poly6502.Microprocessor
     {
         public Action OpCodeMethod { get; }
         public Action AddressingModeMethod { get; }
+        public int MachineCycles { get; }
+        public int InstructionBytes { get; }
 
-        public Operation(Action operation, Action addressingMode)
+        public Operation(Action operation, Action addressingMode, int instructionBytes, int machineCycles)
         {
             OpCodeMethod = operation;
             AddressingModeMethod = addressingMode;
+            MachineCycles = machineCycles;
         }
 
         public bool OpCodeCompare(Action opCode)

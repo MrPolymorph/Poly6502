@@ -31,9 +31,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.IsTrue(lda.OpCodeCompare(_m6502.LDA));
             Assert.IsTrue(adc.OpCodeCompare(_m6502.ADC));
 
-            _m6502.PC = 0xC000;
+            _m6502.Pc = 0xC000;
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>()))
+            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                 .Returns(0x0A)
                 .Returns(0x19);
 
@@ -84,9 +84,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.IsTrue(lda.OpCodeCompare(_m6502.LDA));
             Assert.IsTrue(adc.OpCodeCompare(_m6502.ADC));
 
-            _m6502.PC = 0xC000;
+            _m6502.Pc = 0xC000;
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>()))
+            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                 .Returns(0xF0)
                 .Returns(0x14)
                 .Returns(0x01)
