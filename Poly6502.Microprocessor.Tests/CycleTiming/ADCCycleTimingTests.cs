@@ -10,33 +10,13 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
 {
     public class ADCCycleTimingTests
     {
-        private List<CycleTruthData> _truthData;
-        
         private M6502 _m6502;
         private Mock<IDataBusCompatible> _mockRam;
         
-        private void SetupTruthTable()
-        {
-            _truthData = new List<CycleTruthData>()
-            {
-                /* ADC */
-                /* Immediate */   new CycleTruthData(0x69, 2),
-                /* Zero Page */   new CycleTruthData(0x65, 3),
-                /* Zero Page X */ new CycleTruthData(0x75, 4),
-                /* Absolute */    new CycleTruthData(0x6D, 4),
-                /* Absolute X */  new CycleTruthData(0x7D, 4, true),
-                /* Absolute Y */  new CycleTruthData(0x79, 4, true),
-                /* Indirect X */  new CycleTruthData(0x61, 6),
-                /* Indirect Y */  new CycleTruthData(0x71, 5, true),
-                
-            };
-        }
         
         [SetUp]
         public void Setup()
         {
-            SetupTruthTable();
-            
             _m6502 = new M6502();
             _mockRam = new Mock<IDataBusCompatible>();
             
@@ -44,38 +24,21 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
         }
 
         [Test]
-        public void Test_ADC_Cycle_Timing()
+        [TestCase((byte)0x69)]
+        [TestCase((byte)0x65)]
+        [TestCase((byte)0x75)]
+        [TestCase((byte)0x6D)]
+        [TestCase((byte)0x7D, true)]
+        [TestCase((byte)0x79, true)]
+        [TestCase((byte)0x61)]
+        [TestCase((byte)0x71, true)]
+        public void Test_ADC_Cycle_Timing(byte opcode, bool crossesBoundary = false)
         {
             StringBuilder sb = new StringBuilder();
             
-            foreach (var truth in _truthData)
-            {
-                TestAdc(truth.OpCode);
 
-                var takenCycles = (_m6502.PreviousInstructionCycleLength + 1 + _m6502.PreviousAddressingModeCycleLength);
-
-                if (!truth.BoundaryCrossable)
-                {
-                    Assert.AreEqual(truth.Cycles, takenCycles, $"opcode 0x{truth.OpCode:X2}", $"OpCode 0x{truth.OpCode:x2} Passed");
-                    Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                }
-                else
-                {
-                    if(takenCycles != truth.Cycles && takenCycles != truth.MaxPotentialCycles)
-                        Assert.Fail($"Expected {truth.Cycles} or {truth.MaxPotentialCycles} cycles. Actual : {takenCycles}");
-                    else if (takenCycles == truth.Cycles || takenCycles == truth.MaxPotentialCycles)
-                    {
-                        Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                    }
-                }
-            }
-        }
-        
-        
-        public void TestAdc(byte opcode)
-        {
             Operation op = _m6502.OpCodeLookupTable[opcode];
-
+            
             Assert.IsTrue(op.OpCodeCompare(_m6502.ADC));
             
             _m6502.Pc = 0xC000;
@@ -83,7 +46,6 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
             _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
                 .Returns(opcode)
                 .Returns(0x05);
-            
             
             _m6502.Fetch();
             
@@ -96,7 +58,24 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
             {
                 _m6502.Execute();
             } while (_m6502.OpCodeInProgress);
-            
+
+            var takenCycles = (_m6502.PreviousInstructionCycleLength + 1 + _m6502.PreviousAddressingModeCycleLength);
+
+            if (!crossesBoundary)
+            {
+                Assert.AreEqual(op.MachineCycles, takenCycles, $"Opcode 0x{opcode:X2}", $"OpCode 0x{opcode:x2} Passed");
+                Console.WriteLine($"OpCode 0x{opcode:x2} Passed");
+            }
+            else
+            {
+                if(takenCycles != op.MachineCycles && takenCycles != op.MachineCycles + 1)
+                    Assert.Fail($"Expected {op.MachineCycles} or {op.MachineCycles + 1} cycles. Actual : {takenCycles}");
+                else if (takenCycles == op.MachineCycles || takenCycles == op.MachineCycles + 1)
+                {
+                    Console.WriteLine($"OpCode 0x{opcode:x2} Passed");
+                }
+            }
+        
         }
     }
 }

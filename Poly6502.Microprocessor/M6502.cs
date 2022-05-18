@@ -614,6 +614,7 @@ namespace Poly6502.Microprocessor
                     OutputAddressToPins(AddressBusAddress);
                     InstructionLoByte = DataBusData;
                     AddressingModeInProgress = false;
+                    _addressingModeCycles++;
                     break;
             }
         }
@@ -652,6 +653,7 @@ namespace Poly6502.Microprocessor
                     OutputAddressToPins(AddressBusAddress);
                     AddressBusAddress = TempAddress;
                     AddressingModeInProgress = false;
+                    _addressingModeCycles++;
                     break;
             }
         }
@@ -682,6 +684,7 @@ namespace Poly6502.Microprocessor
                     InstructionLoByte = DataBusData;
                     OutputAddressToPins(InstructionLoByte);
                     AddressingModeInProgress = false;
+                    _addressingModeCycles++;
                     break;
             }
         }
@@ -802,18 +805,21 @@ namespace Poly6502.Microprocessor
                     BeginOpCode();
                     AddressBusAddress++;
                     OutputAddressToPins(AddressBusAddress);
+                    _addressingModeCycles++;
                     break;
                 }
                 case 1:
                     InstructionLoByte = DataBusData;
                     AddressBusAddress++;
                     OutputAddressToPins(AddressBusAddress);
+                    _addressingModeCycles++;
                     break;
                 case 2:
                     InstructionHiByte = DataBusData;
                     ushort address = (ushort) ((ushort) ((InstructionHiByte << 8 | InstructionLoByte)) + X);
                     OutputAddressToPins(address);
                     AddressingModeInProgress = false;
+                    _addressingModeCycles++;
                     break;
             }
 
@@ -1261,20 +1267,26 @@ namespace Poly6502.Microprocessor
                 case (1):
                 {
                     var result = DataBusData << 1;
+                    
+                    _instructionCycles++;
+                    
                     P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
                     P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
 
                     if (OpCode == 0x0A)
-                        A = (byte) result;
+                    {
+                        A = (byte)result;
+                    }
                     else
                     {
+                        _instructionCycles++;
+                        
                         UpdateRw(false);
                         DataBusData = (byte) result;
                         OutputDataToDatabus();
                     }
-
-
+                    
                     AddressBusAddress++;
                     EndOpCode();
                     break;
