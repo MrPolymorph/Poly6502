@@ -31,62 +31,29 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
                 
             };
         }
-        
-        [SetUp]
-        public void Setup()
-        {
-            SetupTruthTable();
-            
-            _m6502 = new M6502();
-            _mockRam = new Mock<IDataBusCompatible>();
-            
-            _m6502.RegisterDevice(_mockRam.Object, 1);
-        }
 
         [Test]
-        public void Test_LDA_Cycle_Timing()
-        {
-            StringBuilder sb = new StringBuilder();
-            
-            foreach (var truth in _truthData)
-            {
-                TestLDA(truth.OpCode);
-
-                var takenCycles = (_m6502.PreviousInstructionCycleLength + 1 + _m6502.PreviousAddressingModeCycleLength);
-
-                if (!truth.BoundaryCrossable)
-                {
-                    Assert.AreEqual(truth.Cycles, takenCycles, $"opcode 0x{truth.OpCode:X2}", $"OpCode 0x{truth.OpCode:x2} Passed");
-                    Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                }
-                else
-                {
-                    if(takenCycles != truth.Cycles && takenCycles != truth.MaxPotentialCycles)
-                        Assert.Fail($"Expected {truth.Cycles} or {truth.MaxPotentialCycles} cycles. Actual : {takenCycles}");
-                    else if (takenCycles == truth.Cycles || takenCycles == truth.MaxPotentialCycles)
-                    {
-                        Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                    }
-                }
-            }
-        }
+        [TestCase((byte)0xA9)]
+        [TestCase((byte)0xA5)]
+        [TestCase((byte)0xB5)]
+        [TestCase((byte)0xAD)]
+        [TestCase((byte)0xBD, true)]
+        [TestCase((byte)0xB9, true)]
+        [TestCase((byte)0xA1)]
+        [TestCase((byte)0xB1, true)]
         
-        
-        public void TestLDA(byte opcode)
+        public void Test_LDA_Cycle_Timing(byte opcode, bool boundaryCrossable = false)
         {
-            Operation op = _m6502.OpCodeLookupTable[opcode];
-
-            Assert.IsTrue(op.OpCodeCompare(_m6502.LDA));
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+            m6502.RegisterDevice(mockRam.Object, 1);
             
-            _m6502.Pc = 0xC000;
-
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
-                .Returns(opcode)
-                .Returns(0x05);
+            Operation op = m6502.OpCodeLookupTable[opcode];
             
+            Assert.IsTrue(op.OpCodeCompare(m6502.LDA));
             
-
-            
+            CycleTimingTester.TestOpcode(m6502, mockRam, opcode, op);
         }
+
     }
 }

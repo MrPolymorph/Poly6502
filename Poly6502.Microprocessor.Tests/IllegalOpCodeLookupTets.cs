@@ -172,7 +172,7 @@ namespace Poly6502.Microprocessor.Tests
             Assert.True(result.CompareInstruction(_m6502.ANC, _m6502.IMM));
 
             result = _m6502.OpCodeLookupTable[0x2B];
-            Assert.True(result.CompareInstruction(_m6502.ANC, _m6502.IMM));
+            Assert.True(result.CompareInstruction(_m6502.ANC2, _m6502.IMM));
         }
         
         [Test]

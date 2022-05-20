@@ -7,179 +7,95 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
 {
     public class ADCCorrectnessTests
     {
-        private M6502 _m6502;
-        private Mock<IDataBusCompatible> _mockRam;
-        
-        [SetUp]
-        public void Setup()
-        {
-            _m6502 = new M6502();
-            _mockRam = new Mock<IDataBusCompatible>();
-            
-            _m6502.RegisterDevice(_mockRam.Object, 1);
-        }
-
         [Test]
-        public void ADC_SimpleAddition_ImmediateMode()
+        public void ADC_0x69_ImmediateMode_Correctness_Test_No_Carry()
         {
-            // LDA IMM
-            Operation lda = _m6502.OpCodeLookupTable[0xA9];
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0x69) //fetch should return opcode ADC IMM;
+                .Returns(0x0A); //data fetched should be immediately after op code.
             
-            //ADC IMM 
-            Operation adc = _m6502.OpCodeLookupTable[0x69];
-
-            Assert.IsTrue(lda.OpCodeCompare(_m6502.LDA));
-            Assert.IsTrue(adc.OpCodeCompare(_m6502.ADC));
-
-            _m6502.Pc = 0xC000;
-
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
-                .Returns(0x0A)
-                .Returns(0x19);
-
-            // Load the accumulator with 0x0A (10)
-            do
-            {
-                lda.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                lda.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
+            m6502.RegisterDevice(mockRam.Object, 1);
             
-            //Call ADC to add 25
-            do
-            {
-                adc.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
+            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
+            m6502.Clock();
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(2));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
 
-            do
-            {
-                adc.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
+            Assert.AreEqual(0x0A, m6502.A);
             
-            //test result
-            Assert.AreEqual(35, _m6502.A);
-            
-            //test processor status
-            Assert.AreEqual(0x24, _m6502.P.Register);
-        }
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
         
         [Test]
-        public void ADC_SetCarry_ImmediateMode()
+        public void ADC_0x69_ImmediateMode_Correctness_Test_Should_Enable_Carry_Flag()
         {
-            //CLC Implied
-            Operation clc = _m6502.OpCodeLookupTable[0x18];
-            
-            //Store the Accumulator - Zero Page
-            Operation sta = _m6502.OpCodeLookupTable[0x85];
-            
-            // LDA IMM
-            Operation lda = _m6502.OpCodeLookupTable[0xA9];
-            
-            //ADC IMM 
-            Operation adc = _m6502.OpCodeLookupTable[0x69];
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
 
-            Assert.IsTrue(lda.OpCodeCompare(_m6502.LDA));
-            Assert.IsTrue(adc.OpCodeCompare(_m6502.ADC));
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //Load the accumulator IMM
+                .Returns(0xFF) //Accumulator should load with 0x0F
+                .Returns(0x69) //fetch should return opcode ADC IMM;
+                .Returns(0xFF); //data fetched should be immediately after op code.
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
+            m6502.Clock();
+            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
+            m6502.Clock();
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
 
-            _m6502.Pc = 0xC000;
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
-                .Returns(0xF0)
-                .Returns(0x14)
-                .Returns(0x01)
-                .Returns(0x00)
-                .Returns(0x00)
-                .Returns(0x02)
-                .Returns(0x00);
-            
-                
+        [Test] public void ADC_0x69_ImmediateMode_Correctness_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
 
-            //Clear the carry bit
-            do
-            {
-                clc.AddressingModeMethod();
-                
-            } while (_m6502.AddressingModeInProgress);
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //Load the accumulator IMM
+                .Returns(0xFF) //Accumulator should load with 0x0F
+                .Returns(0x69) //fetch should return opcode ADC IMM;
+                .Returns(0x01); //data fetched should be immediately after op code.
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
+            m6502.Clock();
+            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
+            m6502.Clock();
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
 
-            do
-            {
-                clc.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
+            Assert.AreEqual(0, m6502.A);
             
-            Assert.IsTrue(!_m6502.P.HasFlag(StatusRegisterFlags.C));
-            
-            do
-            {
-                lda.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                lda.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
-            
-            Assert.AreEqual(0xF0, _m6502.A);
-            
-            //Call ADC to add 240
-            do
-            {
-                adc.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                adc.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
-            
-            Assert.AreEqual(4, _m6502.A);
-            Assert.IsTrue(_m6502.P.HasFlag(StatusRegisterFlags.C), _m6502.P.ToString());
-            
-            //store the result lo byte
-            do
-            {
-                sta.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-            
-            do
-            {
-                sta.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
-            
-            
-            
-            // Load the accumulator with 0x00 (00)
-            do
-            {
-                lda.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                lda.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
-            
-            Assert.AreEqual(0, _m6502.A);
-            
-            //Call ADC 
-            do
-            {
-                adc.AddressingModeMethod();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                adc.OpCodeMethod();
-            } while (_m6502.OpCodeInProgress);
-            
-            
-            //test result
-            Assert.AreEqual(1, _m6502.A);
-            
-            //test processor status
-            Assert.AreEqual(0x24, _m6502.P.Register);
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
         }
     }
 }

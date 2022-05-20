@@ -10,88 +10,23 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
 {
     public class StackInstructionCycleTimingTests
     {
-                private List<CycleTruthData> _truthData;
-        
-        private M6502 _m6502;
-        private Mock<IDataBusCompatible> _mockRam;
-        
-        private void SetupTruthTable()
-        {
-            _truthData = new List<CycleTruthData>()
-            {
-                /* Stack Instructions */
-                /* Implied */   new CycleTruthData(0x9A, 2),
-                /* Implied */   new CycleTruthData(0xBA, 2),
-                /* Implied */   new CycleTruthData(0x48, 3),
-                /* Implied */   new CycleTruthData(0x68, 4),
-                /* Implied */   new CycleTruthData(0x08, 3),
-                /* Implied */   new CycleTruthData(0x28, 4),
-
-            };
-        }
-        
-        [SetUp]
-        public void Setup()
-        {
-            SetupTruthTable();
-            
-            _m6502 = new M6502();
-            _mockRam = new Mock<IDataBusCompatible>();
-            
-            _m6502.RegisterDevice(_mockRam.Object, 1);
-        }
-
         [Test]
-        public void Test_StackInstructions_Cycle_Timing()
-        {
-            StringBuilder sb = new StringBuilder();
-            
-            foreach (var truth in _truthData)
-            {
-                TestStackInstructions(truth.OpCode);
-
-                var takenCycles = (_m6502.PreviousInstructionCycleLength + 1 + _m6502.PreviousAddressingModeCycleLength);
-
-                if (!truth.BoundaryCrossable)
-                {
-                    Assert.AreEqual(truth.Cycles, takenCycles, $"opcode 0x{truth.OpCode:X2}", $"OpCode 0x{truth.OpCode:x2} Passed");
-                    Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                }
-                else
-                {
-                    if(takenCycles != truth.Cycles && takenCycles != truth.MaxPotentialCycles)
-                        Assert.Fail($"Expected {truth.Cycles} or {truth.MaxPotentialCycles} cycles. Actual : {takenCycles}");
-                    else if (takenCycles == truth.Cycles || takenCycles == truth.MaxPotentialCycles)
-                    {
-                        Console.WriteLine($"OpCode 0x{truth.OpCode:x2} Passed");
-                    }
-                }
-            }
-        }
+        [TestCase((byte)0x9A)]
+        [TestCase((byte)0xBA)]
+        [TestCase((byte)0x48)]
+        [TestCase((byte)0x68)]
+        [TestCase((byte)0x08)]
+        [TestCase((byte)0x28)]
         
-        
-        public void TestStackInstructions(byte opcode)
+        public void Test_StackInstructions_Cycle_Timing(byte opcode)
         {
-            Operation op = _m6502.OpCodeLookupTable[opcode];
-            
-            
-            _m6502.Pc = 0xC000;
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+            m6502.RegisterDevice(mockRam.Object, 1);
 
-            _mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(), false))
-                .Returns(opcode)
-                .Returns(0x05);
-            
-            _m6502.Fetch();
+            Operation op = m6502.OpCodeLookupTable[opcode];
 
-            do
-            {
-                _m6502.Execute();
-            } while (_m6502.AddressingModeInProgress);
-
-            do
-            {
-                _m6502.Execute();
-            } while (_m6502.OpCodeInProgress);
+            CycleTimingTester.TestOpcode(m6502, mockRam, opcode, op);
         }
     }
 }
