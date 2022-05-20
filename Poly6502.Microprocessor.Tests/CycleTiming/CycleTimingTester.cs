@@ -16,7 +16,7 @@ public static class CycleTimingTester
             .Returns(opcode)
             .Returns(0x05);
 
-        do
+        while (clocked != op.MachineCycles)
         {
             m6502.Clock();    
             
@@ -25,7 +25,7 @@ public static class CycleTimingTester
             if(clocked > op.MachineCycles)
                 Assert.Fail($"op 0x{opcode:x2} failed as it took {clocked} and was expected to take {op.MachineCycles}");
             
-        } while (clocked != op.MachineCycles);
+        } 
             
         Assert.IsTrue(m6502.FetchInstruction, $"opcode 0x{opcode:x2} did not finish completing. Cycles Taken : {m6502.CurrentTotalCyclesTaken}, Expected to Take {op.MachineCycles}");
     }

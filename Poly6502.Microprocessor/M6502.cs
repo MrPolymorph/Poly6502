@@ -630,6 +630,7 @@ namespace Poly6502.Microprocessor
                 case 2: //Cycle 3 Perform a read from absolute (16-bit) address
                     DataBusData = Read(AddressBusAddress);
                     AddressBusAddress = TempAddress;
+                    AddressingModeInProgress = false;
                     break;
             }
             _addressingModeCycles++;
@@ -654,6 +655,9 @@ namespace Poly6502.Microprocessor
                     InstructionHiByte = 0;
                     AddressBusAddress++;
                     InstructionLoByte = Read(AddressBusAddress);
+                    break;
+                case 1:
+                    AddressingModeInProgress = false;
                     break;
             }
             
@@ -1238,15 +1242,15 @@ namespace Poly6502.Microprocessor
             {
                 A = (byte)result;
             }
-            else if (OpCode == 0x0e)
-            {
-                _instructionCycles++;
-            }
             else
             {
-                UpdateRw(false);
-                SetData((byte)result);
-                OutputDataToDatabus();
+                if (_instructionCycles == 0)
+                {
+                    UpdateRw(false);
+                    SetData((byte)result);
+                    OutputDataToDatabus();
+                    _instructionCycles++;
+                }
             }
 
             AddressBusAddress++;
