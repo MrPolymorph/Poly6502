@@ -4,7 +4,6 @@ This is a WIP emulation of the MOS Technologies 6502 microprocessor.
 The ultimate goal is to have an accurate emulation with a full suite of comprehensive 
 passing tests.
 
----
 ##Building
 
 ---
