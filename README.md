@@ -4,7 +4,7 @@ This is a WIP emulation of the MOS Technologies 6502 microprocessor.
 The ultimate goal is to have an accurate emulation with a full suite of comprehensive 
 passing tests.
 
-##Building
+## Building
 
 ---
 The emulator is written in .Net 6 and can be built on most operating
@@ -59,7 +59,7 @@ Once the build is complete, you can verify unit tests by running.
 dotnet test
 ```
 
-##Contributing
+## Contributing
 
 ---
 
