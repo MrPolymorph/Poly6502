@@ -16,17 +16,19 @@ public static class CycleTimingTester
             .Returns(opcode)
             .Returns(0x05);
 
-        while (clocked != op.MachineCycles)
+        do
         {
-            m6502.Clock();    
-            
             clocked++;
+
+            m6502.Clock();
             
-            if(clocked > op.MachineCycles)
-                Assert.Fail($"op 0x{opcode:x2} failed as it took {clocked} and was expected to take {op.MachineCycles}");
+            if (clocked > op.MachineCycles)
+                Assert.Fail(
+                    $"op 0x{opcode:x2} failed as it took {clocked} and was expected to take {op.MachineCycles}");
+
+        } while ((clocked != op.MachineCycles));
             
-        } 
-            
-        Assert.IsTrue(m6502.FetchInstruction, $"opcode 0x{opcode:x2} did not finish completing. Cycles Taken : {m6502.CurrentTotalCyclesTaken}, Expected to Take {op.MachineCycles}");
+        Assert.AreEqual(clocked, op.MachineCycles, $"opcode 0x{opcode:x2} did not take the required amount of machine cycles to complete. Expected: {op.MachineCycles} Actual: {clocked}");
+        Assert.IsTrue(m6502.FetchInstruction, $"opcode 0x{opcode:x2} did not finish completing. Cycles Taken : {clocked}, Expected to Take {op.MachineCycles}");
     }
 }
