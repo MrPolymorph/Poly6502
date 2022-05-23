@@ -2,7 +2,7 @@ using NUnit.Framework;
 
 namespace Poly6502.Microprocessor.Tests
 {
-    public class Tests
+    public class OpcodeLookupTests
     {
         private M6502 _m6502;
         
