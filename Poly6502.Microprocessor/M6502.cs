@@ -678,8 +678,8 @@ namespace Poly6502.Microprocessor
             {
                 case 0: //Cycle 1 Read 
                     AddressBusAddress = Read((ushort)(Pc + X));
-                    AddressBusAddress &= 0xFF;
                     Pc++;
+                    AddressBusAddress &= 0xFF;
                     break;
                 case 1:
                     _operand = Read(AddressBusAddress);
@@ -741,26 +741,26 @@ namespace Poly6502.Microprocessor
                 case 0: //set the address bus to get the lo byte of the address
                     InstructionLoByte = Read(Pc);
                     Pc++;
-                    _addressingModeCycles++;
                     break;
                 case 1:
                     InstructionHiByte = Read(Pc);
                     Pc++;
-
                     AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + Y);
-
+                    break;
+                case 2:
                     if (!BoundaryCrossed())
                     {
+                        _operand = Read(AddressBusAddress);
                         AddressingModeInProgress = false;
-                        break;
                     }
-
-                    _addressingModeCycles++;
+                    
                     break;
-                case 2: //Dummy Boundary Cross Cycle Penalty.
+                case 3: //boundary crossing penalty
                     AddressingModeInProgress = false;
                     break;
             }
+            
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -785,26 +785,26 @@ namespace Poly6502.Microprocessor
                 case 0: //set the address bus to get the lo byte of the address
                     InstructionLoByte = Read(Pc);
                     Pc++;
-                    _addressingModeCycles++;
                     break;
                 case 1:
                     InstructionHiByte = Read(Pc);
                     Pc++;
-
                     AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + X);
-
+                    break;
+                case 2:
                     if (!BoundaryCrossed())
                     {
+                        _operand = Read(AddressBusAddress);
                         AddressingModeInProgress = false;
-                        break;
                     }
-
-                    _addressingModeCycles++;
+                    
                     break;
-                case 2: //Dummy Boundary Cross Cycle Penalty.
+                case 3: //boundary crossing penalty
                     AddressingModeInProgress = false;
                     break;
             }
+            
+            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -869,7 +869,15 @@ namespace Poly6502.Microprocessor
                 {
                     InstructionHiByte = Read((ushort)((_offset + X + 1) & 0xFF));
                     AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
-
+                    break;
+                }
+                case (3):
+                {
+                    _operand = Read(AddressBusAddress);
+                    break;
+                }
+                case (4):
+                {
                     AddressingModeInProgress = false;
                     break;
                 }
@@ -903,20 +911,21 @@ namespace Poly6502.Microprocessor
                 case (1):
                     InstructionLoByte = Read((ushort)(TempAddress & 0xFF));
                     break;
-                case (2):
+                case 2:
                     InstructionHiByte = Read((ushort)((TempAddress + 1) & 0xFF));
                     
                     AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + Y);
-
-                    if (BoundaryCrossed())
-                    {
-                        _instructionCycles++;
-                        break;
-                    }
-
-                    AddressingModeInProgress = false;
+                    
                     break;
-                case (3): //Dummy Boundary Cross Cycle Penalty.
+                case 3: //boundary crossing penalty
+                    _operand = Read(AddressBusAddress);
+                    
+                    if (!BoundaryCrossed())
+                    {
+                        AddressingModeInProgress = false;
+                    }
+                    break;
+                case 4:
                     AddressingModeInProgress = false;
                     break;
             }
@@ -1145,11 +1154,10 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void AND()
         {
-            A = (byte)(A & DataBusData);
+            A = (byte)(A & _operand);
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-            AddressBusAddress++;
-            _instructionCycles++;
+            
             EndOpCode();
         }
 
@@ -2337,7 +2345,7 @@ namespace Poly6502.Microprocessor
         {
             BeginOpCode();
             
-            A = DataBusData;
+            A = _operand;
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
@@ -3708,8 +3716,6 @@ namespace Poly6502.Microprocessor
             CpuRead = true;
             OpComplete?.Invoke(this, null);
             AddressBusAddress++;
-
-            Pc++;
         }
 
         private void SetData(byte databusData)

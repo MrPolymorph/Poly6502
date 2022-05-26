@@ -68,3 +68,15 @@ Some tasks also don't require much knowledge to get started.
 .
 
 For more information on getting started, see our Contributing Guide and our Code Review Guidelines to see what code quality guidelines we follow.
+
+## Resources
+
+---
+There are lots of great resources out there, here are just a few to help you get started.
+
+| Link                                                            | Description              |
+|-----------------------------------------------------------------|--------------------------|
+ | https://www.masswerk.at/6502/6502_instruction_set.html          | 6502 Instruction Set     |
+| https://www.princeton.edu/~mae412/HANDOUTS/Datasheets/6502.pdf  | Synertek 6502 Data Sheet |
+| http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf     | Rockwell 6502 Data Sheet |
+| https://www.nesdev.org/wiki/Cycle_counting                      | Cycle Counting           |

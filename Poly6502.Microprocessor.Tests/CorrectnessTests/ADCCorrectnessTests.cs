@@ -10,20 +10,20 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
     {
         #region 0x69 Immediate Mode
         [Test]
-        public void ADC_ImmediateMode_Correctness_Test_No_Carry()
+        public void ADC_ImmediateMode_Test_No_Carry()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
-                .Returns(0x69) //fetch should return opcode ADC IMM;
-                .Returns(0x0A); //data fetched should be immediately after op code.
+                .Returns(0x69) //ADC
+                .Returns(0x0A); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
 
-            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
-            m6502.Clock();
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Execute ADC
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(2));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
@@ -38,28 +38,30 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         }        
         
         [Test]
-        public void ADC_ImmediateMode_Correctness_Test_Should_Enable_Carry_Flag()
+        public void ADC_ImmediateMode_Test_Should_Enable_Carry_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
-                .Returns(0xA9) //Load the accumulator IMM
-                .Returns(0xFF) //Accumulator should load with 0x0F
-                .Returns(0x69) //fetch should return opcode ADC IMM;
-                .Returns(0xFF); //data fetched should be immediately after op code.
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //Operand
+                .Returns(0x69) //ADC
+                .Returns(0xFF); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
-            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
-            m6502.Clock();
-            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
-            m6502.Clock();
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Execute ADC
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
 
             Assert.AreEqual(0xFE, m6502.A);
             
@@ -69,7 +71,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
         }
 
-        [Test] public void ADC_ImmediateMode_Correctness_Test_Should_Enable_Zero_Flag()
+        [Test] public void ADC_ImmediateMode_Test_Should_Enable_Zero_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
@@ -83,14 +85,16 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
-            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
-            m6502.Clock();
-            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
-            m6502.Clock();
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Execute LDA
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
 
             Assert.AreEqual(0, m6502.A);
             
@@ -104,21 +108,21 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         
         #region 0x65 ZeroPage
         [Test]
-        public void ADC_ZeroPage_Correctness_Test_No_Carry()
+        public void ADC_ZeroPage_Test_No_Carry()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
-                .Returns(0x65) //fetch should return opcode ADC IMM;
-                .Returns(0x0A); //data fetched should be immediately after op code.
+                .Returns(0x65) //ADC
+                .Returns(0x0A); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
 
-            m6502.Clock(); //ADC IMM takes 2 cycles exactly.
-            m6502.Clock();
-            m6502.Clock();
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Fetch Operand
+            m6502.Clock(); //Execute ADC
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(2));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
@@ -133,7 +137,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         }        
         
         [Test]
-        public void ADC_ZeroPage_Correctness_Test_Should_Enable_Carry_Flag()
+        public void ADC_ZeroPage_Test_Should_Enable_Carry_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
@@ -147,15 +151,17 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
-            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Fetch Operand
+            m6502.Clock(); //Execute ADC
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
 
             Assert.AreEqual(0xFE, m6502.A);
             
@@ -165,29 +171,31 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
         }
 
-        [Test] public void ADC_ZeroPage_Correctness_Test_Should_Enable_Zero_Flag()
+        [Test] public void ADC_ZeroPage_Test_Should_Enable_Zero_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
-                .Returns(0xA9) //Load the accumulator IMM
-                .Returns(0xFF) //Accumulator should load with 0xFF
-                .Returns(0x65) //fetch should return opcode ADC ZPA;
-                .Returns(0x01); //data fetched should be immediately after op code.
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA Operand
+                .Returns(0x65) //ADC
+                .Returns(0x01); //ADC Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
-            m6502.Clock(); //LDA IMM takes 2 cycles exactly.
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Fetch Operand
+            m6502.Clock(); //Execute ADC
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
 
             Assert.AreEqual(0, m6502.A);
             
@@ -200,8 +208,8 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         #endregion 0x65 Zero Page
         
         #region 0x75 Zero Page, X
-                [Test]
-        public void ADC_ZeroPageX_Correctness_Test_No_Carry()
+        [Test]
+        public void ADC_ZeroPageX_Test_No_Carry()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
@@ -236,35 +244,40 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         }        
         
         [Test]
-        public void ADC_ZeroPageX_Correctness_Test_Should_Enable_Carry_Flag()
+        public void ADC_ZeroPageX_Test_Should_Enable_Carry_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
-                .Returns(0xA9) //Load the accumulator IMM
-                .Returns(0xFF) //Accumulator should load with 0xFF
-                .Returns(0xA2) //Load the X Register IMM
-                .Returns(0x05) //X should load with 0x05
-                .Returns(0x75) //fetch should return opcode ADC ZPX;
-                .Returns(0x0A) //get the address byte to be offset by the X register 
-                .Returns(0xFF); //data fetched should be from operand + x
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //Operand
+                .Returns(0xA2) //LDX
+                .Returns(0x0A) //Operand
+                .Returns(0x75) //ADC
+                .Returns(0x0A) //ADC Offset 
+                .Returns(0xFF); //ADC Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
-            m6502.Clock(); 
-            m6502.Clock(); 
-            m6502.Clock(); 
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
-            m6502.Clock();
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch LDX
+            m6502.Clock(); //Execute LDX
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Fetch ADC offset
+            m6502.Clock(); //Fetch ADC Operand
+            m6502.Clock(); //Execute ADC
 
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0xF, false), Times.Once);
+            mockRam.Verify(x => x.Read(0xA, false), Times.Once);
 
             Assert.AreEqual(0xFE, m6502.A);
             
@@ -274,7 +287,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
         }
 
-        [Test] public void ADC_ZeroPageX_Correctness_Test_Should_Enable_Zero_Flag()
+        [Test] public void ADC_ZeroPageX_Test_Should_Enable_Zero_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
@@ -310,6 +323,640 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
         }
+        #endregion
+        
+        #region 0x6D Absolute
+        [Test]
+        public void ADC_Absolute_Test_No_Carry()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0x6D) //ADC ABS
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x70);  //Operand
+
+            m6502.RegisterDevice(mockRam.Object, 1);
+
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+            
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+
+            Assert.AreEqual(0x70, m6502.A);
+            
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
+        
+        [Test]
+        public void ADC_Absolute_Test_Should_Enable_Carry_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA operand.
+                .Returns(0x6D) //ADC ABS
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0xFF);  //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+
+        [Test] 
+        public void ADC_Absolute_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //Load the accumulator IMM
+                .Returns(0xFF) //Accumulator should load with 0x0F
+                .Returns(0x6D) //ADC ABS
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x01); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+            
+            Assert.AreEqual(0, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+        #endregion
+        
+        #region 0x7D Absolute,X
+        [Test]
+        public void ADC_AbsoluteX_Test_No_Carry()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0x0A) //LDA Operand
+                .Returns(0x7D) //ADC ABS X
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x70);  //Operand
+
+            m6502.RegisterDevice(mockRam.Object, 1);
+
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+            
+
+            Assert.AreEqual(0x7A, m6502.A);
+            
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
+        
+        [Test]
+        public void ADC_AbsoluteX_Test_Should_Enable_Carry_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA operand.
+                .Returns(0x7D) //ADC ABS
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0xFF); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC X
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+
+        [Test] 
+        public void ADC_AbsoluteX_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //Load the accumulator IMM
+                .Returns(0xFF) //Accumulator should load with 0x0F
+                .Returns(0x7D) //ADC ABS X
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x01); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+            
+            Assert.AreEqual(0, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+        #endregion
+        
+        #region 0x79 Absolute,Y
+        [Test]
+        public void ADC_AbsoluteY_Test_No_Carry()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0x0A) //LDA Operand
+                .Returns(0x79) //ADC ABS Y
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x70);  //Operand
+
+            m6502.RegisterDevice(mockRam.Object, 1);
+
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+            
+
+            Assert.AreEqual(0x7A, m6502.A);
+            
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
+        
+        [Test]
+        public void ADC_AbsoluteY_Test_Should_Enable_Carry_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA operand.
+                .Returns(0x79) //ADC ABS
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0xFF); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC X
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+
+        [Test] 
+        public void ADC_AbsoluteY_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //Load the accumulator IMM
+                .Returns(0xFF) //Accumulator should load with 0x0F
+                .Returns(0x79) //ADC ABS X
+                .Returns(0x0F) //Lo Byte
+                .Returns(0x0F) //HiByte
+                .Returns(0x01); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Absolute Read Lo Byte
+            m6502.Clock(); //Absolute Read Hi Byte
+            m6502.Clock(); //Execute ADC
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(4, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F0F, false), Times.Once);
+            
+            Assert.AreEqual(0, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+        #endregion
+        
+        #region 0x61 (Indirect,X)
+        [Test]
+        public void ADC_IndirectX_Test_No_Carry()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0x0A) //LDA Operand
+                .Returns(0x61) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0x0A); //Operand
+
+            m6502.RegisterDevice(mockRam.Object, 1);
+
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Read Operand
+            m6502.Clock(); //Execute ADC
+
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+            
+
+            Assert.AreEqual(0x14, m6502.A);
+            
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
+        
+        [Test]
+        public void ADC_IndirectX_Test_Should_Enable_Carry_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //Operand
+                .Returns(0x61) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0xFF); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Read Operand
+            m6502.Clock(); //Execute ADC
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+
+        [Test] 
+        public void ADC_IndirectX_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA Operand
+                .Returns(0x61) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0x01); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Read Operand
+            m6502.Clock(); //Execute ADC
+            
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+            
+            Assert.AreEqual(0, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+        #endregion
+        
+        #region 0x71 (Indirect), Y
+        [Test]
+        public void ADC_Indirect_Y_Test_No_Carry()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0x0A) //LDA Operand
+                .Returns(0x71) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0x0A); //Operand
+
+            m6502.RegisterDevice(mockRam.Object, 1);
+
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Execute
+
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+            
+
+            Assert.AreEqual(0x14, m6502.A);
+            
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
+        
+        [Test]
+        public void ADC_Indirect_Y_Test_Should_Enable_Carry_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //Operand
+                .Returns(0x71) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0xFF); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Execute
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+
+            Assert.AreEqual(0xFE, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }
+
+        [Test] 
+        public void ADC_Indirect_Y_Test_Should_Enable_Zero_Flag()
+        {
+            var m6502 = new M6502();
+            var mockRam = new Mock<IDataBusCompatible>();
+
+            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
+                    It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0xFF) //LDA Operand
+                .Returns(0x71) //ADC ABS Y
+                .Returns(0x0F) //Offset
+                .Returns(0x0F) //LoByte
+                .Returns(0x70) //HiByte
+                .Returns(0x01); //Operand
+            
+            m6502.RegisterDevice(mockRam.Object, 1);
+            
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Fetch ADC
+            m6502.Clock(); //Read Offset Byte
+            m6502.Clock(); //Read LoByte
+            m6502.Clock(); //Read HiByte
+            m6502.Clock(); //Execute
+
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
+            mockRam.Verify(x => x.Read(0, false), Times.Once);
+            mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0F, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x10, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x700F, false), Times.Once);
+            
+            Assert.AreEqual(0, m6502.A);
+            
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
+            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.Z));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
+            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
+        }        
         #endregion
     }
 }
