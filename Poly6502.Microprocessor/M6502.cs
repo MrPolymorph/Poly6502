@@ -656,10 +656,12 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case 0: //Cycle 1 Read 
-                    _operand = Read(Pc);
+                    AddressBusAddress = Read(Pc);
+                    AddressBusAddress &= 0xFF;
                     Pc++;
                     break;
                 case 1:
+                    _operand = Read(AddressBusAddress);
                     AddressingModeInProgress = false;
                     break;
             }
@@ -1199,14 +1201,14 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void ASL()
         {
-            var data = DataBusData;
+            var data = _operand;
             var result = data << 1;
 
             P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
             P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
 
-            if (OpCode == 0x0A)
+            if (OpCode == 0x0A) //Hacky McHack
             {
                 A = (byte)result;
             }
@@ -1221,8 +1223,7 @@ namespace Poly6502.Microprocessor
                     return;
                 }
             }
-
-            AddressBusAddress++;
+            
             EndOpCode();
         }
 
