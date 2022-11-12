@@ -137,10 +137,6 @@ public class ANDCorrectnessTests
         m6502.Clock(); //Fetch LDA
         m6502.Clock(); //Execute LDA
         m6502.Clock(); //Fetch AND
-
-        Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.AND);
-
-        m6502.Clock(); //Read ZPA
         m6502.Clock(); //Execute AND
 
         mockRam.Verify(x => x.Read(0, false), Times.Once);
@@ -204,6 +200,7 @@ public class ANDCorrectnessTests
             .Returns(0xA9) //LDA
             .Returns(0x90) //Operand
             .Returns(0x25) //AND
+            .Returns(0x0A) //ZPA
             .Returns(0x80); //Operand
 
         m6502.RegisterDevice(mockRam.Object, 1);
@@ -211,17 +208,12 @@ public class ANDCorrectnessTests
         m6502.Clock(); //Fetch LDA
         m6502.Clock(); //Execute LDA
         m6502.Clock(); //Fetch AND
-
-        Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.AND);
-
-        m6502.Clock(); //Read ZPA
         m6502.Clock(); //Execute AND
 
         mockRam.Verify(x => x.Read(0, false), Times.Once);
         mockRam.Verify(x => x.Read(1, false), Times.Once);
         mockRam.Verify(x => x.Read(2, false), Times.Once);
         mockRam.Verify(x => x.Read(3, false), Times.Once);
-        mockRam.Verify(x => x.Read(4, false), Times.Never);
 
         Assert.AreEqual(0x90 & 0x80, m6502.A);
         Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
@@ -386,38 +378,30 @@ public class ANDCorrectnessTests
 
         mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                 It.IsAny<bool>()))
-            .Returns(0xA2) //LDX
-            .Returns(0x0A) //Operand
             .Returns(0xA9) //LDA
-            .Returns(0x05) //Operand
-            .Returns(0x2D) //AND
-            .Returns(0x0B) //Lo
-            .Returns(0x05) //Hi
+            .Returns(0x05) //LDA Operand
+            .Returns(0x2D) //get AND
+            .Returns(0x05) //get lo
+            .Returns(0xA) //get high
             .Returns(0x05); //Operand
-
+        
         m6502.RegisterDevice(mockRam.Object, 1);
 
-        m6502.Clock(); //Fetch LDX
-        m6502.Clock(); //Execute LDX
-        m6502.Clock(); //Fetch LDA
-        m6502.Clock(); //Execute LDA
+        m6502.Clock(); //Fetch Accumulator 
+        m6502.Clock(); //Execute Accumulator
         m6502.Clock(); //Fetch AND
-
-        Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.AND);
-
-        m6502.Clock(); //Lo Byte
-        m6502.Clock(); //Hi Byte
+        m6502.Clock(); //get low
+        m6502.Clock(); //get hi
         m6502.Clock(); //Execute AND
+        
+        mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(6));
 
         mockRam.Verify(x => x.Read(0, false), Times.Once);
         mockRam.Verify(x => x.Read(1, false), Times.Once);
         mockRam.Verify(x => x.Read(2, false), Times.Once);
         mockRam.Verify(x => x.Read(3, false), Times.Once);
         mockRam.Verify(x => x.Read(4, false), Times.Once);
-        mockRam.Verify(x => x.Read(5, false), Times.Once);
-        mockRam.Verify(x => x.Read(6, false), Times.Once);
-        mockRam.Verify(x => x.Read(0x050B, false), Times.Once);
-        mockRam.Verify(x => x.Read(7, false), Times.Never);
+        mockRam.Verify(x => x.Read(0xA05, false), Times.Once);
 
         Assert.AreEqual(0x05 & 0x05, m6502.A);
         Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));

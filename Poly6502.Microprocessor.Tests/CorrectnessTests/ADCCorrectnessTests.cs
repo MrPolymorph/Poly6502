@@ -115,20 +115,28 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
 
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
+                .Returns(0xA9) //LDA
+                .Returns(0x0A) //LDA Operand
                 .Returns(0x65) //ADC
-                .Returns(0x0A); //Operand
+                .Returns(0x0A) //ZPA address
+                .Returns(0xFF); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
 
+            m6502.Clock(); //Fetch LDA
+            m6502.Clock(); //Fetch LDA Operand
             m6502.Clock(); //Fetch ADC
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
-            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(2));
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(5));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
+            mockRam.Verify(x => x.Read(2, false), Times.Once);
+            mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0xA, false), Times.Once);
 
-            Assert.AreEqual(0x0A, m6502.A);
+            Assert.AreEqual(0x14, m6502.A);
             
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
@@ -146,8 +154,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
                     It.IsAny<bool>()))
                 .Returns(0xA9) //Load the accumulator IMM
                 .Returns(0xFF) //Accumulator should load with 0x0F
-                .Returns(0x65) //fetch should return opcode ADC IMM;
-                .Returns(0xFF); //data fetched should be immediately after op code.
+                .Returns(0x65) //ADC
+                .Returns(0x0A) //ZPA address
+                .Returns(0x0FF); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
@@ -157,11 +166,12 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
-            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(5));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
             mockRam.Verify(x => x.Read(2, false), Times.Once);
             mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0A, false), Times.Once);
 
             Assert.AreEqual(0xFE, m6502.A);
             
@@ -181,7 +191,8 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
                 .Returns(0xA9) //LDA
                 .Returns(0xFF) //LDA Operand
                 .Returns(0x65) //ADC
-                .Returns(0x01); //ADC Operand
+                .Returns(0x0A) //ZPA address
+                .Returns(0x01); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
             
@@ -191,11 +202,12 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
-            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
+            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(5));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
             mockRam.Verify(x => x.Read(2, false), Times.Once);
             mockRam.Verify(x => x.Read(3, false), Times.Once);
+            mockRam.Verify(x => x.Read(0x0A, false), Times.Once);
 
             Assert.AreEqual(0, m6502.A);
             
@@ -315,7 +327,6 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
 
-            
             Assert.AreEqual(0, m6502.A);
             
             Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
