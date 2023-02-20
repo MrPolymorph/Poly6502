@@ -18,4 +18,8 @@
       <ProjectReference Include="..\Poly6502.Microprocessor\Poly6502.Microprocessor.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="Files\Klaus2m5Tests\6502_functional_test.bin" />
+    </ItemGroup>
+
 </Project>

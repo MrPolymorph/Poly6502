@@ -1,4 +1,3 @@
-using System;
 using Moq;
 using NUnit.Framework;
 using Poly6502.Interfaces;
@@ -24,6 +23,8 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
 
             m6502.Clock(); //Fetch ADC
             m6502.Clock(); //Execute ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(2));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
@@ -57,6 +58,8 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch ADC
             m6502.Clock(); //Execute ADC
             
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
             mockRam.Verify(x => x.Read(1, false), Times.Once);
@@ -88,7 +91,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
-            m6502.Clock(); //Execute LDA
+            m6502.Clock(); //Execute ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
             
             mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(4));
             mockRam.Verify(x => x.Read(0, false), Times.Once);
@@ -116,16 +121,19 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                     It.IsAny<bool>()))
                 .Returns(0xA9) //LDA
-                .Returns(0x0A) //LDA Operand
+                .Returns(0x05) //LDA Operand
                 .Returns(0x65) //ADC
                 .Returns(0x0A) //ZPA address
-                .Returns(0xFF); //Operand
+                .Returns(0x05); //Operand
             
             m6502.RegisterDevice(mockRam.Object, 1);
 
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Fetch LDA Operand
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
@@ -136,7 +144,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             mockRam.Verify(x => x.Read(3, false), Times.Once);
             mockRam.Verify(x => x.Read(0xA, false), Times.Once);
 
-            Assert.AreEqual(0x14, m6502.A);
+            Assert.AreEqual(0x0A, m6502.A);
             
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
@@ -163,6 +171,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
@@ -199,6 +210,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Fetch Operand
             m6502.Clock(); //Execute ADC
             
@@ -239,6 +253,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDX
             m6502.Clock(); //Execute LDX
             m6502.Clock(); //Fetch ADC ZPX
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Lo Byte
             m6502.Clock(); //Read Lo Byte + X Offset.
             m6502.Clock(); //Execute ADC
@@ -278,6 +295,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDX
             m6502.Clock(); //Execute LDX
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Fetch ADC offset
             m6502.Clock(); //Fetch ADC Operand
             m6502.Clock(); //Execute ADC
@@ -321,6 +341,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDX
             m6502.Clock(); //Execute LDX
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //ZPX Execute
             m6502.Clock(); //ZPA Execute
             m6502.Clock(); //ADC Execute
@@ -353,6 +376,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.RegisterDevice(mockRam.Object, 1);
 
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -392,6 +418,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -413,7 +442,7 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
         }
 
         [Test] 
-        public void ADC_Absolute_Test_Should_Enable_Zero_Flag()
+        public void DCADC_Absolute_Test_Should_Enable_Zero_Flag()
         {
             var m6502 = new M6502();
             var mockRam = new Mock<IDataBusCompatible>();
@@ -432,6 +461,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -474,6 +506,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -516,6 +551,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC X
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -556,6 +594,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -598,6 +639,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -640,6 +684,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC X
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -680,6 +727,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Absolute Read Lo Byte
             m6502.Clock(); //Absolute Read Hi Byte
             m6502.Clock(); //Execute ADC
@@ -723,6 +773,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte
@@ -769,6 +822,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte
@@ -813,6 +869,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte
@@ -859,6 +918,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte
@@ -904,6 +966,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte
@@ -947,6 +1012,9 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             m6502.Clock(); //Fetch LDA
             m6502.Clock(); //Execute LDA
             m6502.Clock(); //Fetch ADC
+            
+            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
+            
             m6502.Clock(); //Read Offset Byte
             m6502.Clock(); //Read LoByte
             m6502.Clock(); //Read HiByte

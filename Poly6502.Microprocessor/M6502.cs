@@ -1202,7 +1202,7 @@ namespace Poly6502.Microprocessor
         public void ASL()
         {
             var data = _operand;
-            var result = data << 1;
+            int result = (data << 1);
 
             P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
@@ -1214,13 +1214,16 @@ namespace Poly6502.Microprocessor
             }
             else
             {
-                if (_instructionCycles == 0)
+                switch (_instructionCycles)
                 {
-                    UpdateRw(false);
-                    SetData((byte)result);
-                    OutputDataToDatabus();
-                    _instructionCycles++;
-                    return;
+                    case 0:
+                        UpdateRw(false);
+                        SetData((byte)result); //this is an extra instruction cycle.
+                        return;
+                    case 1:
+                        OutputDataToDatabus();
+                        _instructionCycles++;
+                        return;
                 }
             }
             
