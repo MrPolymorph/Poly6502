@@ -7,6 +7,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Poly6502.Interfaces\Poly6502.Interfaces.csproj" />
       <ProjectReference Include="..\Poly6502.Utilities\Poly6502.Utilities.csproj" />
+      <ProjectReference Include="..\SharedModels\SharedModels.csproj" />
     </ItemGroup>
 
 </Project>

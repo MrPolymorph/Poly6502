@@ -10,6 +10,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "UnitTests", "UnitTests", "{
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.Microprocessor.Tests", "Poly6502.Microprocessor.Tests\Poly6502.Microprocessor.Tests.csproj", "{D76986E8-EB0D-4D8D-B4D6-4949541E6E05}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Poly6502.API", "Poly6502.API\Poly6502.API.csproj", "{C0B45B29-06A5-4994-82D4-E6152C25C5B2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedModels", "SharedModels\SharedModels.csproj", "{4EED3AE4-CE69-4601-8407-DA2768613D77}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -32,6 +36,14 @@ Global
 		{D76986E8-EB0D-4D8D-B4D6-4949541E6E05}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D76986E8-EB0D-4D8D-B4D6-4949541E6E05}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D76986E8-EB0D-4D8D-B4D6-4949541E6E05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C0B45B29-06A5-4994-82D4-E6152C25C5B2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C0B45B29-06A5-4994-82D4-E6152C25C5B2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C0B45B29-06A5-4994-82D4-E6152C25C5B2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C0B45B29-06A5-4994-82D4-E6152C25C5B2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4EED3AE4-CE69-4601-8407-DA2768613D77}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4EED3AE4-CE69-4601-8407-DA2768613D77}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4EED3AE4-CE69-4601-8407-DA2768613D77}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4EED3AE4-CE69-4601-8407-DA2768613D77}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D76986E8-EB0D-4D8D-B4D6-4949541E6E05} = {8A4BEEDF-D242-47AD-AA32-594F869F5B2D}
