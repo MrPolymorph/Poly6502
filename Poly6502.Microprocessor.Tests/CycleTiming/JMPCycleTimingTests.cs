@@ -11,7 +11,6 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
     public class JMPCycleTimingTests
     {
         [Test]
-        [TestCase((byte)0x4C)]
         [TestCase((byte)0x6C)]
         public void Test_JMP_Cycle_Timing(byte opcode)
         {

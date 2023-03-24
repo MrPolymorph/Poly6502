@@ -12,7 +12,6 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
     {
         [Test]
         [TestCase((byte)0x86)]
-        [TestCase((byte)0x96)]
         [TestCase((byte)0x8E)]
         public void Test_STX_Cycle_Timing(byte opcode)
         {

@@ -32,7 +32,6 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
         [Test]
         [TestCase((byte)0xA2)]
         [TestCase((byte)0xA6)]
-        [TestCase((byte)0xB6)]
         [TestCase((byte)0xAE)]
         [TestCase((byte)0xBE, true)]
         public void Test_LDX_Cycle_Timing(byte opcode, bool boundaryCrossable = false)

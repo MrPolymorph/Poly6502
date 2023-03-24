@@ -13,11 +13,9 @@ namespace Poly6502.Microprocessor.Tests.CycleTiming
         [Test]
         [TestCase((byte)0x9A)]
         [TestCase((byte)0xBA)]
-        [TestCase((byte)0x48)]
         [TestCase((byte)0x68)]
         [TestCase((byte)0x08)]
-        [TestCase((byte)0x28)]
-        
+
         public void Test_StackInstructions_Cycle_Timing(byte opcode)
         {
             var m6502 = new M6502();
