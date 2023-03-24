@@ -6,35 +6,34 @@ namespace Poly6502.Utilities
 {
     public abstract class AbstractDataBusImplementation : IDataBusCompatible
     {
+        private bool _ignorePropagation;
+        public bool PropagationOverridden { get; private set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
         
-        protected byte _dataBusData;
-        protected bool _cpuRead;
-        protected IList<IDataBusCompatible> _dataBusCompatiblesDevices;
+        protected byte DataBusData;
+        protected bool CpuRead;
+        protected IList<IDataBusCompatible> DataBusCompatiblesDevices;
 
         protected AbstractDataBusImplementation()
         {
             DataBusLines = new Dictionary<int, Action<float>>();
-            _dataBusCompatiblesDevices = new List<IDataBusCompatible>();
+            DataBusCompatiblesDevices = new List<IDataBusCompatible>();
 
+            PropagationOverridden = false;
+            
             for (int i = 0; i < 8; i++)
             {
                 var i1 = i;
                 DataBusLines.Add(i, (inputVoltage) =>
                 {
                     if (inputVoltage > 0)
-                        _dataBusData |= (byte) (1 << i1);
+                        DataBusData |= (byte) (1 << i1);
                     else
-                        _dataBusData &= (byte) ~(1 << i1);
+                        DataBusData &= (byte) ~(1 << i1);
                 });
             }
         }
         
-        public void RegisterDevice(IDataBusCompatible device)
-        {
-            _dataBusCompatiblesDevices.Add(device);
-        }
-
         public void Refresh()
         {
             throw new NotImplementedException();
@@ -42,15 +41,27 @@ namespace Poly6502.Utilities
 
         public void SetRW(bool rw)
         {
-            _cpuRead = rw;
+            CpuRead = rw;
         }
 
         public void PropagationOverride(bool ovr, object invoker)
         {
-            
+            if (invoker != this && !_ignorePropagation)
+            {
+                PropagationOverridden = ovr;
+            }
+        }
+
+        public byte Read(ushort address, bool ronly = false)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Write(ushort address, byte data)
+        {
+            throw new NotImplementedException();
         }
 
         public abstract void Clock();
-        public abstract byte DirectRead(ushort address);
     }
 }

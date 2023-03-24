@@ -5,8 +5,13 @@ namespace Poly6502.Interfaces
 {
     public interface IAddressBusCompatible : IClockable
     {
+        ushort MinAddressableRange { get; }
+        ushort MaxAddressableRange { get; }
+    
         Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
-        void RegisterDevice(IAddressBusCompatible device);
+        void RegisterDevice(IAddressBusCompatible device, int propagationPriority);
+
+        void SetAddress(ushort address);
     }
 }

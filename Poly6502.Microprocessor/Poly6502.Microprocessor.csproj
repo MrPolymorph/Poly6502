@@ -1,12 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net6.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Poly6502.Interfaces\Poly6502.Interfaces.csproj" />
       <ProjectReference Include="..\Poly6502.Utilities\Poly6502.Utilities.csproj" />
+      <ProjectReference Include="..\SharedModels\SharedModels.csproj" />
     </ItemGroup>
 
 </Project>

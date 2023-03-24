@@ -1,37 +1,55 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.Linq;
 using Poly6502.Interfaces;
+using Poly6502.Utilities.Arguments;
 
 namespace Poly6502.Utilities
 {
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
-        private bool _overrideOutput;
         private bool _ignorePropagation;
+
+        private ushort _addressBusAddress;
+        protected event EventHandler AddressChanged;
         
-        public Dictionary<int, Action<float>> AddressBusLines { get; set; }
+        protected readonly IDictionary<int, IAddressBusCompatible> _addressCompatibleDevices;
+        protected readonly IDictionary<int, IDataBusCompatible> _dataCompatibleDevices;
+        protected byte DataBusData { get; set; }
+        protected bool CpuRead { get; set; }
+        protected ushort RelativeAddress { get; set; }
+        
+        
+        public ushort MaxAddressableRange { get; protected set; }
+        public ushort MinAddressableRange { get; protected set; }
+
+        public ushort AddressBusAddress
+        {
+            get => _addressBusAddress; 
+            protected set
+            {
+                AddressChanged?.Invoke(this, new AddressChangedEventArgs(_addressBusAddress, value));
+                _addressBusAddress = value;
+            }
+        }
+        
+        
+        public bool PropagationOverridden { get; private set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
+        public Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
-        protected IList<IAddressBusCompatible> _addressCompatibleDevices;
-        protected IList<IDataBusCompatible> _dataCompatibleDevices;
-
-        public byte DataBusData { get; protected set; }
-        public bool CpuRead { get; protected set; }
-        public ushort AddressBusAddress { get; protected set; }
-        public ushort RelativeAddress { get; protected set; }
-
-        public AbstractAddressDataBus()
+        protected AbstractAddressDataBus()
         {
             CpuRead = true;
             DataBusLines = new Dictionary<int, Action<float>>();
             AddressBusLines = new Dictionary<int, Action<float>>();
-
-            _overrideOutput = false;
-            _ignorePropagation = false;
-            _addressCompatibleDevices = new List<IAddressBusCompatible>();
-            _dataCompatibleDevices = new Collection<IDataBusCompatible>();
             
+            _ignorePropagation = false;
+            _addressCompatibleDevices = new Dictionary<int, IAddressBusCompatible>();
+            _dataCompatibleDevices = new Dictionary<int, IDataBusCompatible>();
+
+            PropagationOverridden = false;
+
             //setup data lines
             for (int i = 0; i < 8; i++)
             {
@@ -45,92 +63,96 @@ namespace Poly6502.Utilities
                 });
             }
 
-            
+
+#if EMULATE_PIN_OUTPUT
             //setup address lines
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 15; i++)
             {
                 var i1 = i;
                 AddressBusLines.Add(i, (inputVoltage) =>
                 {
-                    if (inputVoltage > 0)
-                        AddressBusAddress |= (ushort) (1 << i1);
+                    if(inputVoltage > 0)
+                        _addressBusAddress |= (ushort)(1 << i1);
                     else
-                        AddressBusAddress &= (ushort) ~(1 << i1);
-
-                    if (i1 == 15)
-                    {
-                        Clock();
-                        //OutputDataToDatabus();
-                    }
+                        _addressBusAddress &= (ushort)~(1 << i1);
                 });
             }
+#endif
         }
 
-        public void RegisterDevice(AbstractAddressDataBus device)
+        public void RegisterDevice(IAddressBusCompatible device, int propagationPriority)
         {
-            var deviceAlreadyAdded = false;
-
-            if (!_addressCompatibleDevices.Contains(device))
-                _addressCompatibleDevices.Add(device);
-            else
-                deviceAlreadyAdded = true;
-
-            if (!_dataCompatibleDevices.Contains(device))
-                _dataCompatibleDevices.Add(device);
-            else
-                deviceAlreadyAdded = true;
-            
-            if(!deviceAlreadyAdded)
-                device.RegisterDevice(this);
-        }
-        
-        public void RegisterDevice(IDataBusCompatible device)
-        {
-            _dataCompatibleDevices.Add(device);
-            
-            //check if the device is address bus compatible also
-            if (device is IAddressBusCompatible)
+            if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
             {
-                if(!_addressCompatibleDevices.Contains((IAddressBusCompatible) device))
-                    _addressCompatibleDevices.Add((IAddressBusCompatible) device);
+                _addressCompatibleDevices.Add(propagationPriority, device);
             }
-            
+
+            if (device is IDataBusCompatible compatible)
+            {
+                if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
+                    _dataCompatibleDevices.Add(propagationPriority, compatible);
+            }
         }
-        
+
+        public void RegisterDevice(IDataBusCompatible device,  int propagationPriority)
+        {
+            if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
+            {
+                _dataCompatibleDevices.Add(propagationPriority, device);
+            }
+
+            if (device is IAddressBusCompatible compatible)
+            {
+                if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
+                    _addressCompatibleDevices.Add(propagationPriority, compatible);
+            }
+        }
+
         public void RegisterDevice(IAddressBusCompatible device)
         {
-            _addressCompatibleDevices.Add(device);
-            
-            if (device is IDataBusCompatible)
-            {
-                if(!_dataCompatibleDevices.Contains((IDataBusCompatible) device))
-                    _dataCompatibleDevices.Add((IDataBusCompatible) device);
-            }
+            throw new NotImplementedException();
+        }
+
+        public void SetAddress(ushort address)
+        {
+            AddressBusAddress = address;
         }
 
         protected void IgnorePropagation(bool ovrd)
         {
             _ignorePropagation = ovrd;
         }
-        
+
         public void PropagationOverride(bool ovr, object invoker)
         {
             if (invoker != this && !_ignorePropagation)
-                _overrideOutput = ovr;
+                PropagationOverridden = ovr;
         }
 
         protected virtual void OutputDataToDatabus()
         {
-            if (!_overrideOutput)
+            OutputDataToDatabus(AddressBusAddress);
+        }
+        
+        protected virtual void OutputDataToDatabus(ushort address)
+        {
+            if (!PropagationOverridden)
             {
-                foreach (var device in _dataCompatibleDevices)
+                foreach (var kvp in _dataCompatibleDevices.OrderBy(x => x.Key))
                 {
+#if EMULATE_PIN_OUTPUT
                     for (int i = 0; i < 8; i++)
                     {
                         ushort pw = (ushort) Math.Pow(2, i);
                         var bit = (ushort) (DataBusData & pw) >> i;
                         device.DataBusLines[i](bit);
                     }
+#else
+                    if (CpuRead)
+                        DataBusData = kvp.Value.Read(address);
+                    else
+                        kvp.Value.Write(address, DataBusData);
+#endif
                 }
             }
         }
@@ -139,11 +161,14 @@ namespace Poly6502.Utilities
         {
             foreach (var device in _dataCompatibleDevices)
             {
-                device.PropagationOverride(propagate, this);
+                device.Value.PropagationOverride(propagate, this);
             }
         }
-        
-        
+
+        public abstract byte Read(ushort address, bool ronly = false);
+        public abstract void Write(ushort address, byte data);
+
+
         public abstract void Clock();
         public abstract void SetRW(bool rw);
     }
