@@ -2,6 +2,15 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
+        <Version>0.0.1-pre-alpha</Version>
+        <Title>A 6502 Emulator by MrPolymorph</Title>
+        <Authors>MrPolymorph</Authors>
+        <Description>This is a 6502 microprocessor emulator for .net </Description>
+        <Copyright>Kristopher Early</Copyright>
+        <PackageLicenseUrl>https://github.com/MrPolymorph/Poly6502/blob/main/LICENSE</PackageLicenseUrl>
+        <RepositoryUrl>https://github.com/MrPolymorph/Poly6502</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     </PropertyGroup>
 
 </Project>
