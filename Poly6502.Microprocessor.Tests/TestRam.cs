@@ -1,7 +1,6 @@
 using System;
 using System.IO;
-using Poly6502.Interfaces;
-using Poly6502.Utilities;
+using Poly6502.Microprocessor.Utilities;
 
 namespace Poly6502.Microprocessor.Tests;
 

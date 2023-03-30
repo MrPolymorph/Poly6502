@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Moq;
 using NUnit.Framework;
-using Poly6502.Interfaces;
+using Poly6502.Microprocessor.Interfaces;
 using Poly6502.Microprocessor.Tests.Models;
 
 namespace Poly6502.Microprocessor.Tests.CycleTiming

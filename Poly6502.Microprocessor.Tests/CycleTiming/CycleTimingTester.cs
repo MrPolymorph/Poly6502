@@ -1,6 +1,6 @@
 using Moq;
 using NUnit.Framework;
-using Poly6502.Interfaces;
+using Poly6502.Microprocessor.Interfaces;
 
 namespace Poly6502.Microprocessor.Tests.CycleTiming;
 

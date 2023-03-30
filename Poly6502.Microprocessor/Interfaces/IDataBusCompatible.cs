@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace Poly6502.Interfaces
+namespace Poly6502.Microprocessor.Interfaces
 {
     public interface IDataBusCompatible : IClockable
     {

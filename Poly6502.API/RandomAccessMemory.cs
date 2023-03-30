@@ -1,4 +1,4 @@
-using Poly6502.Utilities;
+using Poly6502.Microprocessor.Utilities;
 
 namespace PolyNES.WRam
 {

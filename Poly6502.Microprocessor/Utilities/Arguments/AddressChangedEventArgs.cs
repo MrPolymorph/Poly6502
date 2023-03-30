@@ -1,6 +1,6 @@
 using System;
 
-namespace Poly6502.Utilities.Arguments
+namespace Poly6502.Microprocessor.Utilities.Arguments
 {
     public class AddressChangedEventArgs : EventArgs
     {

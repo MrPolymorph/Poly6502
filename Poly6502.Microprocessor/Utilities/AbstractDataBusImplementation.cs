@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Poly6502.Interfaces;
+using Poly6502.Microprocessor.Interfaces;
 
-namespace Poly6502.Utilities
+namespace Poly6502.Microprocessor.Utilities
 {
     public abstract class AbstractDataBusImplementation : IDataBusCompatible
     {

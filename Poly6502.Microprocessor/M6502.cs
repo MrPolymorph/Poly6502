@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Microprocessor.Models;
-using Poly6502.Utilities;
-using Poly6502.Utilities.Arguments;
+using Poly6502.Microprocessor.Utilities;
+using Poly6502.Microprocessor.Utilities.Arguments;
 
 namespace Poly6502.Microprocessor
 {

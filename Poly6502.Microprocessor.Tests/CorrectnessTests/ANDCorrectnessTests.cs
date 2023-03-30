@@ -1,7 +1,8 @@
 using Moq;
 using NUnit.Framework;
-using Poly6502.Interfaces;
 using Poly6502.Microprocessor.Flags;
+using Poly6502.Microprocessor.Interfaces;
+using Poly6502.Microprocessor.Models;
 
 namespace Poly6502.Microprocessor.Tests.CorrectnessTests;
 

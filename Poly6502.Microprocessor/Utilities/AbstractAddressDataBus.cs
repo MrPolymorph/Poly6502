@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Poly6502.Interfaces;
-using Poly6502.Utilities.Arguments;
+using Poly6502.Microprocessor.Interfaces;
+using Poly6502.Microprocessor.Utilities.Arguments;
 
-namespace Poly6502.Utilities
+namespace Poly6502.Microprocessor.Utilities
 {
     public abstract class AbstractAddressDataBus : IAddressBusCompatible, IDataBusCompatible
     {
