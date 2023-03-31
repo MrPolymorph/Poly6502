@@ -1441,8 +1441,7 @@ namespace Poly6502.Microprocessor
 
             if (P.HasFlag(StatusRegisterFlags.C))
             {
-                AddressBusAddress++;
-                AddressBusAddress += DataBusData;
+                Pc += DataBusData;
                 Read(AddressBusAddress);
             }
             else
@@ -2293,6 +2292,7 @@ namespace Poly6502.Microprocessor
                     break;
                 case (3):
                     AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    Pc = AddressBusAddress;
                     Read(AddressBusAddress);
                     OpCodeInProgress = false;
                     EndOpCode();
