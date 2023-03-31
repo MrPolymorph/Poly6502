@@ -2247,7 +2247,7 @@ namespace Poly6502.Microprocessor
         {
             BeginOpCode();
             AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
-            Read(AddressBusAddress);
+            Pc = Read(AddressBusAddress);
             EndOpCode();
         }
 
