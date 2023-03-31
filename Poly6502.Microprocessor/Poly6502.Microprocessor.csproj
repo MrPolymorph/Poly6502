@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFramework>net6.0</TargetFramework>
-        <Version>0.0.2-pre-alpha</Version>
+        <Version>0.0.3-pre-alpha</Version>
         <Title>A 6502 Emulator by MrPolymorph</Title>
         <Authors>MrPolymorph</Authors>
         <Description>This is a 6502 microprocessor emulator for .net </Description>
