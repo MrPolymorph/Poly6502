@@ -655,13 +655,10 @@ namespace Poly6502.Microprocessor
         {
             switch (_addressingModeCycles)
             {
-                case 0: //Cycle 1 Read 
-                    AddressBusAddress = Read(Pc);
-                    AddressBusAddress &= 0xFF;
-                    Pc++;
+                case 0:
                     break;
                 case 1:
-                    _operand = Read(AddressBusAddress);
+                    AddressBusAddress = Read(Pc++);
                     AddressingModeInProgress = false;
                     break;
             }
@@ -1416,7 +1413,8 @@ namespace Poly6502.Microprocessor
 
             if (!P.HasFlag(StatusRegisterFlags.C))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
                 Read(AddressBusAddress);
             }
 
@@ -1468,7 +1466,8 @@ namespace Poly6502.Microprocessor
 
             if (P.HasFlag(StatusRegisterFlags.Z))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
                 Read(AddressBusAddress);
             }
 
@@ -1507,7 +1506,7 @@ namespace Poly6502.Microprocessor
         public void BIT()
         {
             BeginOpCode();
-            Read((ushort)(InstructionHiByte << 8 | InstructionLoByte));
+            Read(AddressBusAddress); //there a problem here???
 
             byte temp = (byte)(A & DataBusData);
             P.SetFlag(StatusRegisterFlags.Z, (temp & 0x00FF) == 0);
@@ -1572,6 +1571,7 @@ namespace Poly6502.Microprocessor
                         {
                             AddressBusAddress = (ushort)absolute;
                             AddressBusAddress++;
+                            Pc = AddressBusAddress;
                             EndOpCode();
                         }
                     }
@@ -1610,8 +1610,10 @@ namespace Poly6502.Microprocessor
             if (!P.HasFlag(StatusRegisterFlags.N))
             {
                 AddressBusAddress += DataBusData;
+                Pc = AddressBusAddress;
             }
 
+            Pc++;
             AddressBusAddress++;
             Read(AddressBusAddress);
             EndOpCode();
@@ -1713,12 +1715,10 @@ namespace Poly6502.Microprocessor
 
             if (!P.HasFlag(StatusRegisterFlags.V))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
             }
-
-            AddressBusAddress++;
-
-
+            
             Read(AddressBusAddress);
             EndOpCode();
         }
@@ -1739,7 +1739,8 @@ namespace Poly6502.Microprocessor
 
             if (P.HasFlag(StatusRegisterFlags.V))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
             }
 
             AddressBusAddress++;
@@ -3126,7 +3127,7 @@ namespace Poly6502.Microprocessor
         {
             UpdateRw(false);
             DataBusData = A;
-            OutputDataToDatabus((ushort)(InstructionHiByte << 8 | InstructionLoByte));
+            OutputDataToDatabus(AddressBusAddress);
             OpCodeInProgress = false;
             AddressBusAddress++;
             EndOpCode();
