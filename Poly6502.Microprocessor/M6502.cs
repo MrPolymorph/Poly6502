@@ -2590,9 +2590,8 @@ namespace Poly6502.Microprocessor
                 case (1):
                     BeginOpCode();
                     UpdateRw(false);
-                    Read((ushort)(SP | 0x0100));
                     DataBusData = A;
-                    OutputDataToDatabus();
+                    OutputDataToDatabus((ushort)(SP | 0x0100));
                     _instructionCycles++;
                     break;
                 case (2):
