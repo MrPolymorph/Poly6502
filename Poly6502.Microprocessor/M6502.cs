@@ -826,7 +826,7 @@ namespace Poly6502.Microprocessor
 
                     if ((RelativeAddress & 0x80) != 0)
                     {
-                        RelativeAddress = (ushort)(DataBusData | 0xFF00);
+                        RelativeAddress |= 0xFF00;
                     }
 
                     AddressingModeInProgress = false;
@@ -1609,13 +1609,10 @@ namespace Poly6502.Microprocessor
 
             if (!P.HasFlag(StatusRegisterFlags.N))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + RelativeAddress);
                 Pc = AddressBusAddress;
             }
 
-            Pc++;
-            AddressBusAddress++;
-            Read(AddressBusAddress);
             EndOpCode();
         }
 
@@ -2278,7 +2275,7 @@ namespace Poly6502.Microprocessor
                 case (1): //store the hi byte
                     UpdateRw(false);
                     var temp = (ushort)(0x0100 + SP);
-                    DataBusData = (byte)((AddressBusAddress >> 8) & 0x00FF);
+                    DataBusData = (byte)((Pc >> 8) & 0x00FF);
                     OutputDataToDatabus(temp);
                     SP--;
                     _instructionCycles++;
@@ -2286,13 +2283,12 @@ namespace Poly6502.Microprocessor
                 case (2): //store the lo byte
                     UpdateRw(false);
                     temp = (ushort)(0x0100 + SP);
-                    DataBusData = (byte)((AddressBusAddress & 0x00FF));
+                    DataBusData = (byte)((Pc & 0x00FF));
                     OutputDataToDatabus(temp);
                     SP--;
                     _instructionCycles++;
                     break;
                 case (3):
-                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     Pc = AddressBusAddress;
                     Read(AddressBusAddress);
                     OpCodeInProgress = false;
@@ -2594,7 +2590,7 @@ namespace Poly6502.Microprocessor
                 case (1):
                     BeginOpCode();
                     UpdateRw(false);
-                    Read((ushort)(SP + 0x0100));
+                    Read((ushort)(SP | 0x0100));
                     DataBusData = A;
                     OutputDataToDatabus();
                     _instructionCycles++;
@@ -2621,6 +2617,7 @@ namespace Poly6502.Microprocessor
                 {
                     BeginOpCode();
                     UpdateRw(false);
+                    P.SetFlag(StatusRegisterFlags.B, true); //PHP pushes with the B flag as 1, no matter what
                     DataBusData = P.Register;
                     OutputDataToDatabus((ushort)(0x0100 | SP));
                     P.SetFlag(StatusRegisterFlags.B);
@@ -2656,9 +2653,7 @@ namespace Poly6502.Microprocessor
                 case (1):
                 {
                     SP++;
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort)(0x0100 | SP);
-                    Read(AddressBusAddress);
+                    Read((ushort)(0x0100 | SP));
                     _instructionCycles++;
                     break;
                 }
@@ -2667,8 +2662,6 @@ namespace Poly6502.Microprocessor
                     A = DataBusData;
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-                    AddressBusAddress = TempAddress;
-                    AddressBusAddress++;
                     Read(AddressBusAddress);
                     EndOpCode();
                     break;
@@ -2906,7 +2899,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// RTS (ReTurn from Subroutine
+        /// RTS (ReTurn from Subroutine)
         ///
         /// 
         /// RTS pulls the top 2 bytes off the stack (little endian) and xfers
@@ -2944,6 +2937,7 @@ namespace Poly6502.Microprocessor
                 {
                     InstructionHiByte = DataBusData;
                     AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    Pc = AddressBusAddress;
                     AddressBusAddress++;
                     Read(AddressBusAddress);
                     EndOpCode();
