@@ -2345,7 +2345,7 @@ namespace Poly6502.Microprocessor
         {
             BeginOpCode();
             
-            A = _operand;
+            A = DataBusData;
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
@@ -2492,6 +2492,8 @@ namespace Poly6502.Microprocessor
             }
 
             AddressBusAddress++;
+            
+            EndOpCode();
         }
 
 
