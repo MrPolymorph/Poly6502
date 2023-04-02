@@ -2274,24 +2274,23 @@ namespace Poly6502.Microprocessor
                 }
                 case (1): //store the hi byte
                     UpdateRw(false);
-                    var temp = (ushort)(0x0100 + SP);
-                    DataBusData = (byte)((Pc >> 8) & 0x00FF);
-                    OutputDataToDatabus(temp);
+                    Pc--;
+                    DataBusData = (byte) ((Pc >> 8) & 0x00FF);
+                    OutputDataToDatabus((ushort)(0x0100 | SP));
                     SP--;
                     _instructionCycles++;
                     break;
                 case (2): //store the lo byte
                     UpdateRw(false);
-                    temp = (ushort)(0x0100 + SP);
-                    DataBusData = (byte)((Pc & 0x00FF));
-                    OutputDataToDatabus(temp);
+                    Pc--;
+                    DataBusData = (byte) (Pc + 1 & 0x00FF);
+                    OutputDataToDatabus((ushort)(0x0100 | SP));
                     SP--;
                     _instructionCycles++;
                     break;
                 case (3):
                     Pc = AddressBusAddress;
                     Read(AddressBusAddress);
-                    OpCodeInProgress = false;
                     EndOpCode();
                     break;
             }
@@ -2918,26 +2917,23 @@ namespace Poly6502.Microprocessor
                 {
                     BeginOpCode();
                     SP++;
-                    AddressBusAddress = (ushort)(0x0100 + SP);
-                    Read(AddressBusAddress);
+                    Read((ushort)(0x0100 | SP));
+                    AddressBusAddress = DataBusData;
                     _instructionCycles++;
                     break;
                 }
                 case (1):
                 {
-                    InstructionLoByte = DataBusData;
                     SP++;
-                    AddressBusAddress = (ushort)(0x0100 + SP);
-                    Read(AddressBusAddress);
+                    Read((ushort) (0x0100 + SP));
+                    AddressBusAddress |= (ushort)(DataBusData << 8);
                     _instructionCycles++;
                     break;
                 }
                 case (2):
                 {
-                    InstructionHiByte = DataBusData;
-                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
-                    Pc = AddressBusAddress;
                     AddressBusAddress++;
+                    Pc = AddressBusAddress;
                     Read(AddressBusAddress);
                     EndOpCode();
                     break;
