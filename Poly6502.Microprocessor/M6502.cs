@@ -659,6 +659,7 @@ namespace Poly6502.Microprocessor
                     break;
                 case 1:
                     AddressBusAddress = Read(Pc++);
+                    _operand = DataBusData;
                     AddressingModeInProgress = false;
                     break;
             }
@@ -710,6 +711,7 @@ namespace Poly6502.Microprocessor
                  case (0): //Cycle 1 Read Lo Byte
                      AddressBusAddress = (ushort)(Read(Pc) + Y);
                      AddressBusAddress &= 0xFF;
+                     _operand = DataBusData;
                      Pc++;
                      AddressingModeInProgress = false;
                      break;
@@ -2345,7 +2347,7 @@ namespace Poly6502.Microprocessor
         {
             BeginOpCode();
             
-            A = DataBusData;
+            A = _operand;
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
