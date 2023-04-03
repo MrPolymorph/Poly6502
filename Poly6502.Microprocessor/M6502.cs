@@ -656,10 +656,10 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case 0:
+                    AddressBusAddress = Read(Pc++);
                     break;
                 case 1:
-                    AddressBusAddress = Read(Pc++);
-                    _operand = DataBusData;
+                    _operand = Read(AddressBusAddress);
                     AddressingModeInProgress = false;
                     break;
             }
