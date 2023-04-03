@@ -953,17 +953,25 @@ namespace Poly6502.Microprocessor
                 case 1:
                     InstructionHiByte = Read(Pc);
                     Pc++;
-
-                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     break;
                 case 2:
-                    InstructionHiByte = InstructionLoByte == 0xFF ? Read((ushort)(AddressBusAddress & 0xFF)) : Read((ushort)(AddressBusAddress + 1));
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     break;
                 case 3:
-                    InstructionLoByte = Read(AddressBusAddress);
-
-                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
-                    AddressingModeInProgress = false;
+                    if (InstructionLoByte == 0x00FF)
+                    {
+                        ushort temp = (ushort) ((Read((ushort)(AddressBusAddress & 0xFF00)) << 8) 
+                                              | Read((ushort)(AddressBusAddress + 0)));
+                        
+                        AddressBusAddress = temp;
+                    }
+                    else
+                    {
+                        ushort temp = (ushort) ((Read((ushort)(AddressBusAddress + 1)) << 8) 
+                                                | Read((ushort)(AddressBusAddress + 0)));
+                        
+                        AddressBusAddress = temp;
+                    }
                     break;
             }
 
@@ -1535,11 +1543,14 @@ namespace Poly6502.Microprocessor
 
             if (P.HasFlag(StatusRegisterFlags.N))
             {
-                AddressBusAddress += DataBusData;
+                var temp = Pc + RelativeAddress;
+
+                if ((temp & 0xFF00) != (Pc & 0xFF00)) ;
+                    //this should cause an extra cycle?
+
+                Pc = (ushort) temp;
             }
-
-            AddressBusAddress++;
-
+            
             EndOpCode();
         }
 
