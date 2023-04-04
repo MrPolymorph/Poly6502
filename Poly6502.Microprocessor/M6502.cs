@@ -746,7 +746,8 @@ namespace Poly6502.Microprocessor
                 case 1:
                     InstructionHiByte = Read(Pc);
                     Pc++;
-                    AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + Y);
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    AddressBusAddress += Y;
                     break;
                 case 2:
                     if (!BoundaryCrossed())
@@ -972,6 +973,8 @@ namespace Poly6502.Microprocessor
                         
                         AddressBusAddress = temp;
                     }
+
+                    AddressingModeInProgress = false;
                     break;
             }
 
@@ -2256,7 +2259,6 @@ namespace Poly6502.Microprocessor
         public void JMP()
         {
             BeginOpCode();
-            AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
             Pc = AddressBusAddress;
             EndOpCode();
         }
@@ -2333,7 +2335,7 @@ namespace Poly6502.Microprocessor
         ///         <description>4 Cycles</description>
         ///     </item>
         ///     <item>
-        ///         <term>Absolute: </term>
+        ///         <term>Absolute: </term> 
         ///         <description>4 Cycles</description>
         ///     </item>
         ///     <item>
