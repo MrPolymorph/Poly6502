@@ -1,7 +1,8 @@
 # Poly6502
 
-![example workflow](https://github.com/MrPolymorph/Poly6502/actions/workflows/dotnet.yml/badge.svg)
+![example workflow](https://github.com/MrPolymorph/Poly6502/actions/workflows/build.yml/badge.svg)
 ![example workflow](https://github.com/MrPolymorph/Poly6502/actions/workflows/codeql.yml/badge.svg)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=MrPolymorph_Poly6502&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=MrPolymorph_Poly6502)
 [![NuGet version (Poly6502)](https://img.shields.io/badge/nuget-v1.0.1-blue)](https://www.nuget.org/packages/Poly6502.Microprocessor/)
 
 This is a WIP emulation of the MOS Technologies 6502 microprocessor.
