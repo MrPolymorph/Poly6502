@@ -710,10 +710,12 @@ namespace Poly6502.Microprocessor
              switch (_addressingModeCycles)
              {
                  case (0): //Cycle 1 Read Lo Byte
-                     AddressBusAddress = (ushort)(Read(Pc) + Y);
-                     AddressBusAddress &= 0xFF;
-                     _operand = DataBusData;
+                     AddressBusAddress = Read(Pc);
+                     AddressBusAddress += Y;
                      Pc++;
+
+                     AddressBusAddress &= 0x00FF;
+                     Read(AddressBusAddress);
                      AddressingModeInProgress = false;
                      break;
              }
@@ -1521,7 +1523,7 @@ namespace Poly6502.Microprocessor
         public void BIT()
         {
             BeginOpCode();
-            Read(AddressBusAddress); //there a problem here???
+            Read(AddressBusAddress);
 
             byte temp = (byte)(A & DataBusData);
             P.SetFlag(StatusRegisterFlags.Z, (temp & 0x00FF) == 0);
