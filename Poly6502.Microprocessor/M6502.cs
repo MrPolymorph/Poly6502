@@ -750,9 +750,10 @@ namespace Poly6502.Microprocessor
                     AddressBusAddress += Y;
                     break;
                 case 2:
+                    _operand = Read(AddressBusAddress);
+                    
                     if (!BoundaryCrossed())
                     {
-                        _operand = Read(AddressBusAddress);
                         AddressingModeInProgress = false;
                     }
                     
