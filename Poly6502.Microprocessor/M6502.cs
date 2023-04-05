@@ -677,7 +677,8 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case 0: //Cycle 1 Read 
-                    AddressBusAddress = Read((ushort)(Pc + X));
+                    AddressBusAddress = Read((ushort)(Pc));
+                    AddressBusAddress += X;
                     Pc++;
                     AddressBusAddress &= 0xFF;
                     break;
