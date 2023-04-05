@@ -1,4 +1,9 @@
 # Poly6502
+
+![example workflow](https://github.com/MrPolymorph/Poly6502/actions/workflows/dotnet.yml/badge.svg)
+![example workflow](https://github.com/MrPolymorph/Poly6502/actions/workflows/codeql.yml/badge.svg)
+[![NuGet version (Poly6502)](https://img.shields.io/badge/nuget-v1.0.1-blue)](https://www.nuget.org/packages/Poly6502.Microprocessor/)
+
 This is a WIP emulation of the MOS Technologies 6502 microprocessor.
 
 The ultimate goal is to have an accurate emulation with a full suite of comprehensive 
