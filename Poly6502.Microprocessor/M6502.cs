@@ -3319,10 +3319,10 @@ namespace Poly6502.Microprocessor
                 }
                 case (2):
                 {
-                    A = (byte)(A & _operand);
+                    A = (byte)(A & DataBusData);
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-
+            
                     EndOpCode();
                     break;
                 }
