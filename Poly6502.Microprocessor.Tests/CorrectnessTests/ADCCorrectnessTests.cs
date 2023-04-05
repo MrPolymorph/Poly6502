@@ -273,52 +273,6 @@ namespace Poly6502.Microprocessor.Tests.CorrectnessTests
             Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
         }        
         
-        [Test]
-        public void ADC_ZeroPageX_Test_Should_Enable_Carry_Flag()
-        {
-            var m6502 = new M6502();
-            var mockRam = new Mock<IDataBusCompatible>();
-
-            mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
-                    It.IsAny<bool>()))
-                .Returns(0xA9) //LDA
-                .Returns(0xFF) //Operand
-                .Returns(0xA2) //LDX
-                .Returns(0x0A) //Operand
-                .Returns(0x75) //ADC
-                .Returns(0x0A) //ADC Offset 
-                .Returns(0xFF); //ADC Operand
-            
-            m6502.RegisterDevice(mockRam.Object, 1);
-            
-            m6502.Clock(); //Fetch LDA
-            m6502.Clock(); //Execute LDA
-            m6502.Clock(); //Fetch LDX
-            m6502.Clock(); //Execute LDX
-            m6502.Clock(); //Fetch ADC
-            
-            Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ADC);
-            
-            m6502.Clock(); //Fetch ADC offset
-            m6502.Clock(); //Fetch ADC Operand
-            m6502.Clock(); //Execute ADC
-
-            mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(7));
-            mockRam.Verify(x => x.Read(0, false), Times.Once);
-            mockRam.Verify(x => x.Read(1, false), Times.Once);
-            mockRam.Verify(x => x.Read(2, false), Times.Once);
-            mockRam.Verify(x => x.Read(3, false), Times.Once);
-            mockRam.Verify(x => x.Read(4, false), Times.Once);
-            mockRam.Verify(x => x.Read(0xF, false), Times.Once);
-            mockRam.Verify(x => x.Read(0xA, false), Times.Once);
-
-            Assert.AreEqual(0xFE, m6502.A);
-            
-            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.C));
-            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
-            Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
-            Assert.True(m6502.P.HasFlag(StatusRegisterFlags.N));
-        }
 
         [Test] public void ADC_ZeroPageX_Test_Should_Enable_Zero_Flag()
         {

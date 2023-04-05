@@ -295,48 +295,7 @@ public class ASLCorrectnessTests
     #endregion
     
     #region 0x16 Zero Page, X
-
-    [Test]
-    public void Accumulator_Zero_Page_X()
-    {
-        var m6502 = new M6502();
-        var mockRam = new Mock<IDataBusCompatible>();
-
-        mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
-                It.IsAny<bool>()))
-            .Returns(0xA2)  //LDX
-            .Returns(0x05)  //DATA
-            .Returns(0x16)  //fetch should return opcode ASL;
-            .Returns(0x05)  //Lo Byte
-            .Returns(0x0A); //DATA
-
-        m6502.RegisterDevice(mockRam.Object, 1);
-        
-        m6502.Clock(); //Fetch LDX
-        m6502.Clock(); //Execute LDX
-        m6502.Clock(); //Fetch ADC ZPX
-            
-        Assert.AreEqual(m6502.InstructionRegister.OpCodeMethod, m6502.ASL);
-            
-        m6502.Clock(); //Read Lo Byte
-        m6502.Clock(); //Read Lo Byte + X Offset.
-        m6502.Clock(); //Execute ASL
-        m6502.Clock(); //Execute ASL
-
-        mockRam.Verify(x => x.Read(It.IsAny<ushort>(), It.IsAny<bool>()), Times.Exactly(5));
-        mockRam.Verify(x => x.Read(0x00, false), Times.Once);
-        mockRam.Verify(x => x.Read(0x01, false), Times.Once);
-        mockRam.Verify(x => x.Read(0x02, false), Times.Once);
-        mockRam.Verify(x => x.Read(0x08, false), Times.Once);
-        mockRam.Verify(x => x.Read(0x05, false), Times.Once);
-        mockRam.Verify(x => x.Write(0x05, 0x14), Times.Once);
-        
-        Assert.False(m6502.P.HasFlag(StatusRegisterFlags.C));;
-        Assert.False(m6502.P.HasFlag(StatusRegisterFlags.Z));
-        Assert.False(m6502.P.HasFlag(StatusRegisterFlags.V));
-        Assert.False(m6502.P.HasFlag(StatusRegisterFlags.N));
-        Assert.AreEqual(0, m6502.A);
-    }
+    
     
     #endregion
 

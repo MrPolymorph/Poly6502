@@ -838,6 +838,7 @@ namespace Poly6502.Microprocessor
                     }
 
                     AddressingModeInProgress = false;
+                    AddressBusAddress = Pc;
                     break;
             }
         }
@@ -1591,7 +1592,6 @@ namespace Poly6502.Microprocessor
                         else
                         {
                             AddressBusAddress = (ushort)absolute;
-                            AddressBusAddress++;
                             Pc = AddressBusAddress;
                             EndOpCode();
                         }
@@ -3288,31 +3288,45 @@ namespace Poly6502.Microprocessor
 
         public void RLA()
         {
-            var result = DataBusData << 1 | (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
-
-            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-            P.SetFlag(StatusRegisterFlags.Z, result == 0);
-            P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) != 0);
-
-            if (OpCode == 0x2A)
-                A = (byte)result;
-            else
+            switch (_instructionCycles)
             {
-                if (_instructionCycles == 0)
+                case (0):
                 {
-                    UpdateRw(false);
-                    DataBusData = (byte)result;
-                    OutputDataToDatabus();
+                    BeginOpCode();
                     _instructionCycles++;
-                    return;
+                    break;
+                }
+                case (1):
+                {
+                    var result = DataBusData << 1 | (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
+
+                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
+                    P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) != 0);
+
+                    if (OpCode == 0x2A)
+                        A = (byte)result;
+                    else
+                    {
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
+                        OutputDataToDatabus();
+                    }
+
+                    AddressBusAddress++;
+                    _instructionCycles++;
+                    break;
+                }
+                case (2):
+                {
+                    A = (byte)(A & _operand);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+
+                    EndOpCode();
+                    break;
                 }
             }
-
-            A = (byte)(A & DataBusData);
-            P.SetFlag(StatusRegisterFlags.Z, A == 0);
-            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-            AddressBusAddress++;
-            EndOpCode();
         }
 
         public void SRE()
