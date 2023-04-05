@@ -1,12 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net5.0</TargetFramework>
+        <TargetFramework>net6.0</TargetFramework>
+        <Version>0.0.3-pre-alpha</Version>
+        <Title>A 6502 Emulator by MrPolymorph</Title>
+        <Authors>MrPolymorph</Authors>
+        <Description>This is a 6502 microprocessor emulator for .net </Description>
+        <Copyright>Kristopher Early</Copyright>
+        <PackageLicenseUrl>https://github.com/MrPolymorph/Poly6502/blob/main/LICENSE</PackageLicenseUrl>
+        <RepositoryUrl>https://github.com/MrPolymorph/Poly6502</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+        <PackageVersion>1.0.1</PackageVersion>
     </PropertyGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\Poly6502.Interfaces\Poly6502.Interfaces.csproj" />
-      <ProjectReference Include="..\Poly6502.Utilities\Poly6502.Utilities.csproj" />
-    </ItemGroup>
 
 </Project>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+    <ItemGroup>
+<<<<<<< HEAD:Poly6502.Tests/Poly6502.Tests.csproj
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.5.0" />
+        <PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />
+        <PackageReference Include="MSTest.TestFramework" Version="2.2.10" />
+        <PackageReference Include="coverlet.collector" Version="3.2.0" />
+=======
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
+        <PackageReference Include="Moq" Version="4.16.1" />
+        <PackageReference Include="NUnit" Version="3.13.1" />
+        <PackageReference Include="NUnit3TestAdapter" Version="3.17.0" />
+        <PackageReference Include="coverlet.collector" Version="3.0.2" />
+>>>>>>> main:Poly6502.Microprocessor.Tests/Poly6502.Microprocessor.Tests.csproj
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Poly6502.Microprocessor\Poly6502.Microprocessor.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Files\Klaus2m5Tests\6502_functional_test.bin" />
+    </ItemGroup>
+
+</Project>

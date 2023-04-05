@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
+using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
-using Poly6502.Utilities;
+using Poly6502.Microprocessor.Models;
+using Poly6502.Microprocessor.Utilities;
+using Poly6502.Microprocessor.Utilities.Arguments;
 
 namespace Poly6502.Microprocessor
 {
@@ -13,59 +15,210 @@ namespace Poly6502.Microprocessor
     /// </summary>
     public class M6502 : AbstractAddressDataBus
     {
-        private bool _pcFetchComplete;
-
-
-        private int _instructionCycles;
-        private int _addressingModeCycles;
-        private int _pcCurrentFetchCycle;
-        private ushort _indirectAddress;
         private ushort _offset;
 
+        /// <summary>
+        /// 8-bit A register
+        /// </summary>
+        private byte _a;
+
+        /// <summary>
+        /// 8-bit X register
+        /// </summary>
+        private byte _x;
+
+        /// <summary>
+        /// 8-bit Y register
+        /// </summary>
+        private byte _y;
+
+        /// <summary>
+        /// 8-bit stack pointer
+        /// </summary>
+        private byte _sp;
+
+        /// <summary>
+        /// operand byte
+        /// </summary>
+        private byte _operand;
+
+        /// <summary>
+        /// current instruction cycles
+        /// </summary>
+        private int _instructionCycles;
+
+        /// <summary>
+        /// current addressing mode cycles.
+        /// </summary>
+        private int _addressingModeCycles;
+
+        /// <summary>
+        /// 8-bit status register
+        /// </summary>
+        private StatusRegister _p;
+
+        /// <summary>
+        /// Current op 
+        /// </summary>
+        private Operation _instructionRegister;
+
+        /// <summary>
+        /// Set if the microprocessor is currently fetching the instruction to run.
+        /// </summary>
+        public bool FetchInstruction { get; private set; }
+
+        public event EventHandler ClockComplete;
+        public event EventHandler OpComplete;
+        public event EventHandler FetchComplete;
+        public event ProcessorEventHandler ProcessorStateChange;
+
+        public delegate void ProcessorEventHandler(object? sender, ProcessorStateChangedEventArgs args);
+
+        /// <summary>
+        /// Op Code lookup table.
+        /// </summary>
         public Dictionary<byte, Operation> OpCodeLookupTable { get; private set; }
 
-        /// <summary>
-        /// Accumulator
-        /// </summary>
-        public byte A { get; private set; }
 
         /// <summary>
-        /// X Register
+        /// 8-Bit Accumulator
         /// </summary>
-        public byte X { get; private set; }
+        public byte A
+        {
+            get => _a;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.ARegister,
+                    _a, value));
+
+                _a = value;
+            }
+        }
 
         /// <summary>
-        /// Y Register
+        /// 8-Bit X Register
         /// </summary>
-        public byte Y { get; private set; }
+        public byte X
+        {
+            get => _x;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.XRegister,
+                    _x, value));
+
+                _x = value;
+            }
+        }
 
         /// <summary>
-        /// Stack Pointer
+        /// 8-Bit Y Register
         /// </summary>
-        public byte SP { get; private set; }
+        public byte Y
+        {
+            get => _y;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.YRegister,
+                    _y, value));
 
+                _y = value;
+            }
+        }
 
-        public ushort PC { get; private set; }
+        /// <summary>
+        /// 8-Bit Stack Pointer
+        /// </summary>
+        public byte SP
+        {
+            get => _sp;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.StackPointer,
+                    _sp, value));
 
+                _sp = value;
+            }
+        }
+
+        /// <summary>
+        /// 16-Bit Program Counter
+        /// </summary>
+        public ushort Pc { get; set; }
+
+        /// <summary>
+        /// The current instruction Lo Byte 
+        /// </summary>
         public byte InstructionLoByte { get; set; }
+
+        /// <summary>
+        /// The current instruction Hi Byte
+        /// </summary>
         public byte InstructionHiByte { get; set; }
 
-        /// <summary>
-        /// Status Register / Processor Flags
-        /// </summary>
-        public StatusRegister P { get; private set; }
 
+        /// <summary>
+        /// 8-Bit Status Register / Processor Flags
+        /// </summary>
+        public StatusRegister P
+        {
+            get => _p;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.StatusRegister,
+                    _p, value));
+
+                _p = value;
+            }
+        }
+
+        /// <summary>
+        /// The operation function currently being run.
+        /// </summary>
+        public Operation InstructionRegister
+        {
+            get => _instructionRegister;
+            private set
+            {
+                ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(StateChangeType.Op,
+                    _instructionRegister, value));
+
+                _instructionRegister = value;
+            }
+        }
+
+        /// <summary>
+        /// The op code currently being run.
+        /// </summary>
         public byte OpCode { get; private set; }
 
-
+        /// <summary>
+        /// Voltage from the input pin.
+        /// </summary>
         public float InputVoltage { get; private set; }
 
-        public ushort AbsoluteAddress { get; private set; }
+        /// <summary>
+        /// ???
+        /// </summary>
         public ushort TempAddress { get; private set; }
+
+        /// <summary>
+        /// True if an instruction is being executed.
+        /// </summary>
         public bool OpCodeInProgress { get; private set; }
+
+        /// <summary>
+        /// True if the addressing mode is being processed.
+        /// </summary>
         public bool AddressingModeInProgress { get; private set; }
 
+        /// <summary>
+        /// +1 is because a fetch is always 1 cycle.
+        /// </summary>
+        public int CurrentTotalCyclesTaken => _instructionCycles + _addressingModeCycles + 1;
 
+        /// <summary>
+        /// constructor.
+        /// </summary>
         public M6502()
         {
             IgnorePropagation(true);
@@ -74,287 +227,343 @@ namespace Poly6502.Microprocessor
             OpCodeLookupTable = new Dictionary<byte, Operation>()
             {
                 /* 0 Row */
-                {0x00, new Operation(BRK, IMP)},
-                {0x01, new Operation(ORA, IZX)},
-                {0x05, new Operation(ORA, ZPA)},
-                {0x06, new Operation(ASL, ZPA)},
-                {0x08, new Operation(PHP, IMP)},
-                {0x09, new Operation(ORA, IMM)},
-                {0x0A, new Operation(ASL, ACC)},
-                {0x0D, new Operation(ORA, ABS)},
-                {0x0E, new Operation(ASL, ABS)},
+                { 0x00, new Operation(BRK, IMP, 1, 7) },
+                { 0x01, new Operation(ORA, IZX, 2, 6) },
+                { 0x05, new Operation(ORA, ZPA, 2, 3) },
+                { 0x06, new Operation(ASL, ZPA, 2, 5) },
+                { 0x08, new Operation(PHP, IMP, 1, 3) },
+                { 0x09, new Operation(ORA, IMM, 2, 2) },
+                { 0x0A, new Operation(ASL, ACC, 1, 2) },
+                { 0x0D, new Operation(ORA, ABS, 3, 4) },
+                { 0x0E, new Operation(ASL, ABS, 3, 6) },
 
                 /* 1 Row */
-                {0x10, new Operation(BPL, REL)},
-                {0x11, new Operation(ORA, IZY)},
-                {0x15, new Operation(ORA, ZPX)},
-                {0x16, new Operation(ASL, ZPX)},
-                {0x18, new Operation(CLC, IMP)},
-                {0x19, new Operation(ORA, ABY)},
-                {0x1D, new Operation(ORA, ABX)},
-                {0x1E, new Operation(ASL, ABX)},
+                { 0x10, new Operation(BPL, REL, 2, 2) },
+                { 0x11, new Operation(ORA, IZY, 2, 5) },
+                { 0x15, new Operation(ORA, ZPX, 2, 4) },
+                { 0x16, new Operation(ASL, ZPX, 2, 6) },
+                { 0x18, new Operation(CLC, IMP, 1, 2) },
+                { 0x19, new Operation(ORA, ABY, 3, 4) },
+                { 0x1D, new Operation(ORA, ABX, 3, 4) },
+                { 0x1E, new Operation(ASL, ABX, 3, 7) },
 
                 /* 2 Row */
-                {0x20, new Operation(JSR, ABS)},
-                {0x21, new Operation(AND, IZX)},
-                {0x24, new Operation(BIT, ZPA)},
-                {0x25, new Operation(AND, ZPA)},
-                {0x26, new Operation(ROL, ZPA)},
-                {0x28, new Operation(PLP, IMP)},
-                {0x29, new Operation(AND, IMM)},
-                {0x2A, new Operation(ROL, ACC)},
-                {0x2C, new Operation(BIT, ABS)},
-                {0x2D, new Operation(AND, ABS)},
-                {0x2E, new Operation(ROL, ABS)},
+                { 0x20, new Operation(JSR, ABS, 3, 6) },
+                { 0x21, new Operation(AND, IZX, 2, 6) },
+                { 0x24, new Operation(BIT, ZPA, 2, 3) },
+                { 0x25, new Operation(AND, ZPA, 2, 3) },
+                { 0x26, new Operation(ROL, ZPA, 2, 5) },
+                { 0x28, new Operation(PLP, IMP, 1, 4) },
+                { 0x29, new Operation(AND, IMM, 2, 2) },
+                { 0x2A, new Operation(ROL, ACC, 1, 2) },
+                { 0x2C, new Operation(BIT, ABS, 3, 4) },
+                { 0x2D, new Operation(AND, ABS, 3, 4) },
+                { 0x2E, new Operation(ROL, ABS, 3, 6) },
 
                 /* 3 Row */
-                {0x30, new Operation(BMI, REL)},
-                {0x31, new Operation(AND, IZY)},
-                {0x35, new Operation(AND, ZPX)},
-                {0x36, new Operation(ROL, ZPX)},
-                {0x38, new Operation(SEC, IMP)},
-                {0x39, new Operation(AND, ABY)},
-                {0x3D, new Operation(AND, ABX)},
-                {0x3E, new Operation(ROL, ABX)},
+                { 0x30, new Operation(BMI, REL, 2, 2) },
+                { 0x31, new Operation(AND, IZY, 2, 5) },
+                { 0x35, new Operation(AND, ZPX, 2, 4) },
+                { 0x36, new Operation(ROL, ZPX, 2, 6) },
+                { 0x38, new Operation(SEC, IMP, 1, 2) },
+                { 0x39, new Operation(AND, ABY, 3, 4) },
+                { 0x3D, new Operation(AND, ABX, 3, 4) },
+                { 0x3E, new Operation(ROL, ABX, 3, 7) },
 
                 /* 4 Row */
-                {0x40, new Operation(RTI, IMP)},
-                {0x41, new Operation(EOR, IZX)},
-                {0x45, new Operation(EOR, ZPA)},
-                {0x46, new Operation(LSR, ZPA)},
-                {0x48, new Operation(PHA, IMP)},
-                {0x49, new Operation(EOR, IMM)},
-                {0x4A, new Operation(LSR, ACC)},
-                {0x4C, new Operation(JMP, ABS)},
-                {0x4D, new Operation(EOR, ABS)},
-                {0x4E, new Operation(LSR, ABS)},
+                { 0x40, new Operation(RTI, IMP, 1, 6) },
+                { 0x41, new Operation(EOR, IZX, 2, 6) },
+                { 0x45, new Operation(EOR, ZPA, 2, 3) },
+                { 0x46, new Operation(LSR, ZPA, 2, 5) },
+                { 0x48, new Operation(PHA, IMP, 1, 3) },
+                { 0x49, new Operation(EOR, IMM, 2, 2) },
+                { 0x4A, new Operation(LSR, ACC, 1, 2) },
+                { 0x4C, new Operation(JMP, ABS, 3, 3) },
+                { 0x4D, new Operation(EOR, ABS, 3, 4) },
+                { 0x4E, new Operation(LSR, ABS, 3, 6) },
 
                 /* 5 Row */
-                {0x50, new Operation(BVC, REL)},
-                {0x51, new Operation(EOR, IZY)},
-                {0x55, new Operation(EOR, ZPX)},
-                {0x56, new Operation(LSR, ZPX)},
-                {0x58, new Operation(CLI, IMP)},
-                {0x59, new Operation(EOR, ABY)},
-                {0x5D, new Operation(EOR, ABX)},
-                {0x5E, new Operation(LSR, ABX)},
+                { 0x50, new Operation(BVC, REL, 2, 2) },
+                { 0x51, new Operation(EOR, IZY, 2, 5) },
+                { 0x55, new Operation(EOR, ZPX, 2, 4) },
+                { 0x56, new Operation(LSR, ZPX, 2, 6) },
+                { 0x58, new Operation(CLI, IMP, 1, 2) },
+                { 0x59, new Operation(EOR, ABY, 3, 4) },
+                { 0x5D, new Operation(EOR, ABX, 3, 4) },
+                { 0x5E, new Operation(LSR, ABX, 3, 7) },
 
                 /* 6 Row */
-                {0x60, new Operation(RTS, IMP)},
-                {0x61, new Operation(ADC, IZX)},
-                {0x65, new Operation(ADC, ZPA)},
-                {0x66, new Operation(ROR, ZPA)},
-                {0x68, new Operation(PLA, IMP)},
-                {0x69, new Operation(ADC, IMM)},
-                {0x6A, new Operation(ROR, ACC)},
-                {0x6C, new Operation(JMP, IND)},
-                {0x6D, new Operation(ADC, ABS)},
-                {0x6E, new Operation(ROR, ABS)},
+                { 0x60, new Operation(RTS, IMP, 1, 6) },
+                { 0x61, new Operation(ADC, IZX, 2, 6) },
+                { 0x65, new Operation(ADC, ZPA, 2, 3) },
+                { 0x66, new Operation(ROR, ZPA, 2, 5) },
+                { 0x68, new Operation(PLA, IMP, 1, 4) },
+                { 0x69, new Operation(ADC, IMM, 2, 2) },
+                { 0x6A, new Operation(ROR, ACC, 1, 2) },
+                { 0x6C, new Operation(JMP, IND, 3, 5) },
+                { 0x6D, new Operation(ADC, ABS, 3, 4) },
+                { 0x6E, new Operation(ROR, ABS, 3, 6) },
 
                 /* 7 Row */
-                {0x70, new Operation(BVS, REL)},
-                {0x71, new Operation(ADC, IZY)},
-                {0x75, new Operation(ADC, ZPX)},
-                {0x76, new Operation(ROR, ZPX)},
-                {0x78, new Operation(SEI, IMP)},
-                {0x79, new Operation(ADC, ABY)},
-                {0x7D, new Operation(ADC, ABX)},
-                {0x7E, new Operation(ROR, ABX)},
+                { 0x70, new Operation(BVS, REL, 2, 2) },
+                { 0x71, new Operation(ADC, IZY, 2, 5) },
+                { 0x75, new Operation(ADC, ZPX, 2, 4) },
+                { 0x76, new Operation(ROR, ZPX, 2, 6) },
+                { 0x78, new Operation(SEI, IMP, 1, 2) },
+                { 0x79, new Operation(ADC, ABY, 3, 4) },
+                { 0x7D, new Operation(ADC, ABX, 3, 4) },
+                { 0x7E, new Operation(ROR, ABX, 3, 7) },
 
                 /* 8 Row */
-                {0x81, new Operation(STA, IZX)},
-                {0x84, new Operation(STY, ZPA)},
-                {0x85, new Operation(STA, ZPA)},
-                {0x86, new Operation(STX, ZPA)},
-                {0x88, new Operation(DEY, IMP)},
-                {0x8A, new Operation(TXA, IMP)},
-                {0x8C, new Operation(STY, ABS)},
-                {0x8D, new Operation(STA, ABS)},
-                {0x8E, new Operation(STX, ABS)},
+                { 0x81, new Operation(STA, IZX, 2, 6) },
+                { 0x84, new Operation(STY, ZPA, 2, 3) },
+                { 0x85, new Operation(STA, ZPA, 2, 3) },
+                { 0x86, new Operation(STX, ZPA, 2, 3) },
+                { 0x88, new Operation(DEY, IMP, 1, 2) },
+                { 0x8A, new Operation(TXA, IMP, 1, 2) },
+                { 0x8C, new Operation(STY, ABS, 3, 4) },
+                { 0x8D, new Operation(STA, ABS, 3, 4) },
+                { 0x8E, new Operation(STX, ABS, 3, 4) },
 
                 /* 9 Row */
-                {0x90, new Operation(BCC, REL)},
-                {0x91, new Operation(STA, IZY)},
-                {0x94, new Operation(STY, ZPX)},
-                {0x95, new Operation(STA, ZPX)},
-                {0x96, new Operation(STX, ZPY)},
-                {0x98, new Operation(TYA, IMP)},
-                {0x99, new Operation(STA, ABY)},
-                {0x9A, new Operation(TXS, IMP)},
-                {0x9D, new Operation(STA, ABX)},
+                { 0x90, new Operation(BCC, REL, 2, 2) },
+                { 0x91, new Operation(STA, IZY, 2, 6) },
+                { 0x94, new Operation(STY, ZPX, 2, 4) },
+                { 0x95, new Operation(STA, ZPX, 2, 4) },
+                { 0x96, new Operation(STX, ZPY, 2, 4) },
+                { 0x98, new Operation(TYA, IMP, 1, 2) },
+                { 0x99, new Operation(STA, ABY, 3, 5) },
+                { 0x9A, new Operation(TXS, IMP, 1, 2) },
+                { 0x9D, new Operation(STA, ABX, 3, 5) },
 
                 /* A Row */
-                {0xA0, new Operation(LDY, IMM)},
-                {0xA1, new Operation(LDA, IZX)},
-                {0xA2, new Operation(LDX, IMM)},
-                {0xA4, new Operation(LDY, ZPA)},
-                {0xA5, new Operation(LDA, ZPA)},
-                {0xA6, new Operation(LDX, ZPA)},
-                {0xA8, new Operation(TAY, IMP)},
-                {0xA9, new Operation(LDA, IMM)},
-                {0xAA, new Operation(TAX, IMP)},
-                {0xAC, new Operation(LDY, ABS)},
-                {0xAD, new Operation(LDA, ABS)},
-                {0xAE, new Operation(LDX, ABS)},
+                { 0xA0, new Operation(LDY, IMM, 2, 2) },
+                { 0xA1, new Operation(LDA, IZX, 2, 6) },
+                { 0xA2, new Operation(LDX, IMM, 2, 2) },
+                { 0xA4, new Operation(LDY, ZPA, 2, 3) },
+                { 0xA5, new Operation(LDA, ZPA, 2, 3) },
+                { 0xA6, new Operation(LDX, ZPA, 2, 3) },
+                { 0xA8, new Operation(TAY, IMP, 1, 2) },
+                { 0xA9, new Operation(LDA, IMM, 2, 2) },
+                { 0xAA, new Operation(TAX, IMP, 1, 2) },
+                { 0xAC, new Operation(LDY, ABS, 3, 4) },
+                { 0xAD, new Operation(LDA, ABS, 3, 4) },
+                { 0xAE, new Operation(LDX, ABS, 3, 4) },
 
                 /* B Row */
-                {0xB0, new Operation(BCS, REL)},
-                {0xB1, new Operation(LDA, IZY)},
-                {0xB4, new Operation(LDY, ZPX)},
-                {0xB5, new Operation(LDA, ZPX)},
-                {0xB6, new Operation(LDX, ZPY)},
-                {0xB8, new Operation(CLV, IMP)},
-                {0xB9, new Operation(LDA, ABY)},
-                {0xBA, new Operation(TSX, IMP)},
-                {0xBC, new Operation(LDY, ABX)},
-                {0xBD, new Operation(LDA, ABX)},
-                {0xBE, new Operation(LDX, ABY)},
+                { 0xB0, new Operation(BCS, REL, 2, 2) },
+                { 0xB1, new Operation(LDA, IZY, 2, 5) },
+                { 0xB4, new Operation(LDY, ZPX, 2, 4) },
+                { 0xB5, new Operation(LDA, ZPX, 2, 4) },
+                { 0xB6, new Operation(LDX, ZPY, 2, 4) },
+                { 0xB8, new Operation(CLV, IMP, 1, 2) },
+                { 0xB9, new Operation(LDA, ABY, 3, 4) },
+                { 0xBA, new Operation(TSX, IMP, 1, 2) },
+                { 0xBC, new Operation(LDY, ABX, 3, 4) },
+                { 0xBD, new Operation(LDA, ABX, 3, 4) },
+                { 0xBE, new Operation(LDX, ABY, 3, 4) },
 
                 /* C Row */
-                {0xC0, new Operation(CPY, IMM)},
-                {0xC1, new Operation(CMP, IZX)},
-                {0xC4, new Operation(CPY, ZPA)},
-                {0xC5, new Operation(CMP, ZPA)},
-                {0xC6, new Operation(DEC, ZPA)},
-                {0xC8, new Operation(INY, IMP)},
-                {0xC9, new Operation(CMP, IMM)},
-                {0xCA, new Operation(DEX, IMP)},
-                {0xCC, new Operation(CPY, ABS)},
-                {0xCD, new Operation(CMP, ABS)},
-                {0xCE, new Operation(DEC, ABS)},
+                { 0xC0, new Operation(CPY, IMM, 2, 2) },
+                { 0xC1, new Operation(CMP, IZX, 2, 6) },
+                { 0xC4, new Operation(CPY, ZPA, 2, 3) },
+                { 0xC5, new Operation(CMP, ZPA, 2, 3) },
+                { 0xC6, new Operation(DEC, ZPA, 2, 5) },
+                { 0xC8, new Operation(INY, IMP, 1, 2) },
+                { 0xC9, new Operation(CMP, IMM, 2, 2) },
+                { 0xCA, new Operation(DEX, IMP, 1, 2) },
+                { 0xCC, new Operation(CPY, ABS, 3, 4) },
+                { 0xCD, new Operation(CMP, ABS, 3, 4) },
+                { 0xCE, new Operation(DEC, ABS, 3, 6) },
 
                 /* D Row */
-                {0xD0, new Operation(BNE, REL)},
-                {0xD1, new Operation(CMP, IZY)},
-                {0xD5, new Operation(CMP, ZPX)},
-                {0xD6, new Operation(DEC, ZPX)},
-                {0xD8, new Operation(CLD, IMP)},
-                {0xD9, new Operation(CMP, ABY)},
-                {0xDD, new Operation(CMP, ABX)},
-                {0xDE, new Operation(DEC, ABX)},
+                { 0xD0, new Operation(BNE, REL, 2, 2) },
+                { 0xD1, new Operation(CMP, IZY, 2, 5) },
+                { 0xD5, new Operation(CMP, ZPX, 2, 4) },
+                { 0xD6, new Operation(DEC, ZPX, 2, 6) },
+                { 0xD8, new Operation(CLD, IMP, 1, 2) },
+                { 0xD9, new Operation(CMP, ABY, 3, 4) },
+                { 0xDD, new Operation(CMP, ABX, 3, 4) },
+                { 0xDE, new Operation(DEC, ABX, 3, 7) },
 
                 /* E Row */
-                {0xE0, new Operation(CPX, IMM)},
-                {0xE1, new Operation(SBC, IZX)},
-                {0xE4, new Operation(CPX, ZPA)},
-                {0xE5, new Operation(SBC, ZPA)},
-                {0xE6, new Operation(INC, ZPA)},
-                {0xE8, new Operation(INX, IMP)},
-                {0xE9, new Operation(SBC, IMM)},
-                {0xEA, new Operation(NOP, IMP)},
-                {0xEC, new Operation(CPX, ABS)},
-                {0xED, new Operation(SBC, ABS)},
-                {0xEE, new Operation(INC, ABS)},
+                { 0xE0, new Operation(CPX, IMM, 2, 2) },
+                { 0xE1, new Operation(SBC, IZX, 2, 6) },
+                { 0xE4, new Operation(CPX, ZPA, 2, 3) },
+                { 0xE5, new Operation(SBC, ZPA, 2, 3) },
+                { 0xE6, new Operation(INC, ZPA, 2, 5) },
+                { 0xE8, new Operation(INX, IMP, 1, 2) },
+                { 0xE9, new Operation(SBC, IMM, 2, 2) },
+                { 0xEA, new Operation(NOP, IMP, 1, 2) },
+                { 0xEC, new Operation(CPX, ABS, 3, 4) },
+                { 0xED, new Operation(SBC, ABS, 3, 4) },
+                { 0xEE, new Operation(INC, ABS, 3, 6) },
 
                 /* F Row */
-                {0xF0, new Operation(BEQ, REL)},
-                {0xF1, new Operation(SBC, IZY)},
-                {0xF5, new Operation(SBC, ZPX)},
-                {0xF6, new Operation(INC, ZPX)},
-                {0xF8, new Operation(SED, IMP)},
-                {0xF9, new Operation(SBC, ABY)},
-                {0xFD, new Operation(SBC, ABX)},
-                {0xFE, new Operation(INC, ABX)},
-                
+                { 0xF0, new Operation(BEQ, REL, 2, 2) },
+                { 0xF1, new Operation(SBC, IZY, 2, 5) },
+                { 0xF5, new Operation(SBC, ZPX, 2, 4) },
+                { 0xF6, new Operation(INC, ZPX, 2, 6) },
+                { 0xF8, new Operation(SED, IMP, 1, 2) },
+                { 0xF9, new Operation(SBC, ABY, 3, 4) },
+                { 0xFD, new Operation(SBC, ABX, 3, 4) },
+                { 0xFE, new Operation(INC, ABX, 3, 7) },
+
                 /* NOP Illegal OpCodes */
-                {0x1A, new Operation(NOP, IMP)},
-                {0x3A, new Operation(NOP, IMP)},
-                {0x5A, new Operation(NOP, IMP)},
-                {0x7A, new Operation(NOP, IMP)},
-                {0xDA, new Operation(NOP, IMP)},
-                {0xFA, new Operation(NOP, IMP)},
-                {0x80, new Operation(NOP, IMM)},
-                {0x82, new Operation(NOP, IMM)},
-                {0x89, new Operation(NOP, IMM)},
-                {0xC2, new Operation(NOP, IMM)},
-                {0xE2, new Operation(NOP, IMM)},
-                {0x04, new Operation(NOP, ZPA)},
-                {0x44, new Operation(NOP, ZPA)},
-                {0x64, new Operation(NOP, ZPA)},
-                {0x14, new Operation(NOP, ZPX)},
-                {0x34, new Operation(NOP, ZPX)},
-                {0x54, new Operation(NOP, ZPX)},
-                {0x74, new Operation(NOP, ZPX)},
-                {0xD4, new Operation(NOP, ZPX)},
-                {0xF4, new Operation(NOP, ZPX)},
-                {0x0C, new Operation(NOP, ABS)},
-                {0x1C, new Operation(NOP, ABX)},
-                {0x3C, new Operation(NOP, ABX)},
-                {0x5C, new Operation(NOP, ABX)},
-                {0x7C, new Operation(NOP, ABX)},
-                {0xDC, new Operation(NOP, ABX)},
-                {0xFC, new Operation(NOP, ABX)},
-                
+                { 0x1A, new Operation(NOP, IMP, 1, 2) },
+                { 0x3A, new Operation(NOP, IMP, 1, 2) },
+                { 0x5A, new Operation(NOP, IMP, 1, 2) },
+                { 0x7A, new Operation(NOP, IMP, 1, 2) },
+                { 0xDA, new Operation(NOP, IMP, 1, 2) },
+                { 0xFA, new Operation(NOP, IMP, 1, 2) },
+                { 0x80, new Operation(NOP, IMM, 2, 2) },
+                { 0x82, new Operation(NOP, IMM, 2, 2) },
+                { 0x89, new Operation(NOP, IMM, 2, 2) },
+                { 0xC2, new Operation(NOP, IMM, 2, 2) },
+                { 0xE2, new Operation(NOP, IMM, 2, 2) },
+                { 0x04, new Operation(NOP, ZPA, 2, 3) },
+                { 0x44, new Operation(NOP, ZPA, 2, 3) },
+                { 0x64, new Operation(NOP, ZPA, 2, 3) },
+                { 0x14, new Operation(NOP, ZPX, 2, 4) },
+                { 0x34, new Operation(NOP, ZPX, 2, 4) },
+                { 0x54, new Operation(NOP, ZPX, 2, 4) },
+                { 0x74, new Operation(NOP, ZPX, 2, 4) },
+                { 0xD4, new Operation(NOP, ZPX, 2, 4) },
+                { 0xF4, new Operation(NOP, ZPX, 2, 4) },
+                { 0x0C, new Operation(NOP, ABS, 3, 4) },
+                { 0x1C, new Operation(NOP, ABX, 3, 4) },
+                { 0x3C, new Operation(NOP, ABX, 3, 4) },
+                { 0x5C, new Operation(NOP, ABX, 3, 4) },
+                { 0x7C, new Operation(NOP, ABX, 3, 4) },
+                { 0xDC, new Operation(NOP, ABX, 3, 4) },
+                { 0xFC, new Operation(NOP, ABX, 3, 4) },
+
                 /* LAX Illegal OpCodes */
-                {0xA7, new Operation(LAX, ZPA)},
-                {0xB7, new Operation(LAX, ZPY)},
-                {0xAF, new Operation(LAX, ABS)},
-                {0xBF, new Operation(LAX, ABY)},
-                {0xA3, new Operation(LAX, IZX)},
-                {0xB3, new Operation(LAX, IZY)},
-                
+                { 0xA7, new Operation(LAX, ZPA, 2, 3) },
+                { 0xB7, new Operation(LAX, ZPY, 2, 4) },
+                { 0xAF, new Operation(LAX, ABS, 3, 4) },
+                { 0xBF, new Operation(LAX, ABY, 3, 4) },
+                { 0xA3, new Operation(LAX, IZX, 2, 6) },
+                { 0xB3, new Operation(LAX, IZY, 2, 5) },
+
                 /* SAX Illegal Opcodes */
-                {0x87, new Operation(SAX, ZPA)},
-                {0x97, new Operation(SAX, ZPY)},
-                {0x8F, new Operation(SAX, ABS)},
-                {0x83, new Operation(SAX, IZX)},
-                
+                { 0x87, new Operation(SAX, ZPA, 2, 3) },
+                { 0x97, new Operation(SAX, ZPY, 2, 4) },
+                { 0x8F, new Operation(SAX, ABS, 3, 4) },
+                { 0x83, new Operation(SAX, IZX, 2, 6) },
+
                 /* USBC Illegal OpCodes */
-                {0xEB, new Operation(SBC, IMM)},
-                
+                { 0xEB, new Operation(SBC, IMM, 2, 2) },
+
                 /* DCP Illegal OpCodes */
-                {0xC7, new Operation(DCP, ZPA)},
-                {0xD7, new Operation(DCP, ZPX)},
-                {0xCF, new Operation(DCP, ABS)},
-                {0xDF, new Operation(DCP, ABX)},
-                {0xDB, new Operation(DCP, ABY)},
-                {0xC3, new Operation(DCP, IZX)},
-                {0xD3, new Operation(DCP, IZY)},
-                
+                { 0xC7, new Operation(DCP, ZPA, 2, 5) },
+                { 0xD7, new Operation(DCP, ZPX, 2, 6) },
+                { 0xCF, new Operation(DCP, ABS, 3, 6) },
+                { 0xDF, new Operation(DCP, ABX, 3, 7) },
+                { 0xDB, new Operation(DCP, ABY, 3, 7) },
+                { 0xC3, new Operation(DCP, IZX, 2, 8) },
+                { 0xD3, new Operation(DCP, IZY, 2, 8) },
+
                 /* ISC Illegal OpCodes */
-                {0xE7, new Operation(ISC, ZPA)},
-                {0xF7, new Operation(ISC, ZPX)},
-                {0xEF, new Operation(ISC, ABS)},
-                {0xFF, new Operation(ISC, ABX)},
-                {0xFB, new Operation(ISC, ABY)},
-                {0xE3, new Operation(ISC, IZX)},
-                {0xF3, new Operation(ISC, IZY)},
-                
+                { 0xE7, new Operation(ISC, ZPA, 2, 5) },
+                { 0xF7, new Operation(ISC, ZPX, 2, 6) },
+                { 0xEF, new Operation(ISC, ABS, 3, 6) },
+                { 0xFF, new Operation(ISC, ABX, 3, 7) },
+                { 0xFB, new Operation(ISC, ABY, 3, 7) },
+                { 0xE3, new Operation(ISC, IZX, 2, 8) },
+                { 0xF3, new Operation(ISC, IZY, 2, 4) },
+
                 /* SLO Illegal OpCodes */
-                {0x07, new Operation(SLO, ZPA)},
-                {0x17, new Operation(SLO, ZPX)},
-                {0x0F, new Operation(SLO, ABS)},
-                {0x1F, new Operation(SLO, ABX)},
-                {0x1B, new Operation(SLO, ABY)},
-                {0x03, new Operation(SLO, IZX)},
-                {0x13, new Operation(SLO, IZY)},
-                
+                { 0x07, new Operation(SLO, ZPA, 2, 5) },
+                { 0x17, new Operation(SLO, ZPX, 2, 6) },
+                { 0x0F, new Operation(SLO, ABS, 3, 6) },
+                { 0x1F, new Operation(SLO, ABX, 3, 7) },
+                { 0x1B, new Operation(SLO, ABY, 3, 7) },
+                { 0x03, new Operation(SLO, IZX, 2, 8) },
+                { 0x13, new Operation(SLO, IZY, 2, 8) },
+
                 /* RLA Illegal OpCodes */
-                {0x27, new Operation(RLA, ZPA)},
-                {0x37, new Operation(RLA, ZPX)},
-                {0x2F, new Operation(RLA, ABS)},
-                {0x3F, new Operation(RLA, ABX)},
-                {0x3B, new Operation(RLA, ABY)},
-                {0x23, new Operation(RLA, IZX)},
-                {0x33, new Operation(RLA, IZY)},
-                
+                { 0x27, new Operation(RLA, ZPA, 2, 5) },
+                { 0x37, new Operation(RLA, ZPX, 2, 6) },
+                { 0x2F, new Operation(RLA, ABS, 3, 6) },
+                { 0x3F, new Operation(RLA, ABX, 3, 7) },
+                { 0x3B, new Operation(RLA, ABY, 3, 7) },
+                { 0x23, new Operation(RLA, IZX, 2, 8) },
+                { 0x33, new Operation(RLA, IZY, 2, 8) },
+
                 /* SRE Illegal OpCodes */
-                {0x47, new Operation(SRE, ZPA)},
-                {0x57, new Operation(SRE, ZPX)},
-                {0x4F, new Operation(SRE, ABS)},
-                {0x5F, new Operation(SRE, ABX)},
-                {0x5B, new Operation(SRE, ABY)},
-                {0x43, new Operation(SRE, IZX)},
-                {0x53, new Operation(SRE, IZY)},
-                
-                /* SRE Illegal OpCodes */
-                {0x67, new Operation(RRA, ZPA)},
-                {0x77, new Operation(RRA, ZPX)},
-                {0x6F, new Operation(RRA, ABS)},
-                {0x7F, new Operation(RRA, ABX)},
-                {0x7B, new Operation(RRA, ABY)},
-                {0x63, new Operation(RRA, IZX)},
-                {0x73, new Operation(RRA, IZY)},
+                { 0x47, new Operation(SRE, ZPA, 2, 5) },
+                { 0x57, new Operation(SRE, ZPX, 2, 6) },
+                { 0x4F, new Operation(SRE, ABS, 3, 6) },
+                { 0x5F, new Operation(SRE, ABX, 3, 7) },
+                { 0x5B, new Operation(SRE, ABY, 3, 7) },
+                { 0x43, new Operation(SRE, IZX, 2, 8) },
+                { 0x53, new Operation(SRE, IZY, 2, 8) },
+
+                /* RRA Illegal OpCodes */
+                { 0x67, new Operation(RRA, ZPA, 2, 5) },
+                { 0x77, new Operation(RRA, ZPX, 2, 6) },
+                { 0x6F, new Operation(RRA, ABS, 3, 6) },
+                { 0x7F, new Operation(RRA, ABX, 3, 7) },
+                { 0x7B, new Operation(RRA, ABY, 3, 7) },
+                { 0x63, new Operation(RRA, IZX, 2, 8) },
+                { 0x73, new Operation(RRA, IZY, 2, 8) },
+
+                /* JAM Illegal Opcodes */
+                { 0x02, new Operation(JAM, IMP, 1, 2) },
+                { 0x12, new Operation(JAM, IMP, 1, 2) },
+                { 0x22, new Operation(JAM, IMP, 1, 2) },
+                { 0x32, new Operation(JAM, IMP, 1, 2) },
+                { 0x42, new Operation(JAM, IMP, 1, 2) },
+                { 0x52, new Operation(JAM, IMP, 1, 2) },
+                { 0x62, new Operation(JAM, IMP, 1, 2) },
+                { 0x72, new Operation(JAM, IMP, 1, 2) },
+                { 0x92, new Operation(JAM, IMP, 1, 2) },
+                { 0xB2, new Operation(JAM, IMP, 1, 2) },
+                { 0xD2, new Operation(JAM, IMP, 1, 2) },
+                { 0xF2, new Operation(JAM, IMP, 1, 2) },
+
+                /* ANC Illegal Opcodes */
+                { 0x0B, new Operation(ANC, IMM, 2, 2) },
+                { 0x2B, new Operation(ANC2, IMM, 2, 2) },
+
+                /* ALR Illegal Opcodes */
+                { 0x4B, new Operation(ALR, IMM, 2, 2) },
+
+                /* ARR Illegal Opcodes */
+                { 0x6B, new Operation(ARR, IMM, 2, 2) },
+
+                /* ANE Illegal Opcodes*/
+                { 0x8B, new Operation(ANE, IMM, 2, 2) },
+
+                /* SHA Illegal Opcodes */
+                { 0x9F, new Operation(SHA, ABY, 3, 5) },
+                { 0x93, new Operation(SHA, IZY, 2, 6) },
+
+                /* TAS Illegal Opcodes */
+                { 0x9B, new Operation(TAS, ABY, 3, 5) },
+
+                /* SHY Illegal Opcodes */
+                { 0x9C, new Operation(SHY, ABX, 3, 5) },
+
+                /* SHX Illegal Opcodes */
+                { 0x9E, new Operation(SHX, ABY, 3, 5) },
+
+                /* LXA Illegal Opcodes */
+                { 0xAB, new Operation(LXA, IMM, 2, 2) },
+
+                /* LAS Illegal Opcodes */
+                { 0xBB, new Operation(LAS, ABY, 3, 4) },
+            };
+
+            AddressChanged += (sender, args) =>
+            {
+                if (args is AddressChangedEventArgs addressArgs)
+                {
+                    ProcessorStateChange?.Invoke(this, new ProcessorStateChangedEventArgs(
+                        StateChangeType.ProgramCounter, addressArgs.OldAddress, addressArgs.NewAddress
+                    ));
+                }
             };
 
             RES();
@@ -362,15 +571,6 @@ namespace Poly6502.Microprocessor
 
 
         #region Addressing Modes
-
-        /*
-         * http://www.emulator101.com/6502-addressing-modes.html :
-         *
-         * When the 6502 refers to addressing modes, it really means "What is the source of the data used in this instruction?" 
-         * The 6502's data book divides the addressing modes into 2 groups, indexed and non-indexed.
-         * 
-         */
-
 
         /// <summary>
         /// Accumulator Addressing
@@ -380,12 +580,18 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void ACC()
         {
-            DataBusData = A;
+            _operand = A;
             AddressingModeInProgress = false;
         }
 
+        /// <summary>
+        /// Implied Addressing
+        ///
+        /// The data is implied as part of the op
+        /// </summary>
         public void IMP()
         {
+            ACC();
             AddressingModeInProgress = false;
         }
 
@@ -398,19 +604,9 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void IMM()
         {
-            switch (_addressingModeCycles)
-            {
-                case 0:
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    break;
-                case 1:
-                    InstructionLoByte = DataBusData;
-                    AddressingModeInProgress = false;
-                    break;
-            }
-
-            _addressingModeCycles++;
+            _operand = Read(Pc);
+            Pc++;
+            AddressingModeInProgress = false;
         }
 
         /// <summary>
@@ -426,28 +622,22 @@ namespace Poly6502.Microprocessor
         {
             switch (_addressingModeCycles)
             {
-                case 0: //set the address bus to get the lo byte of the address
-                {
+                case 0: //Cycle 1 perform a read, getting instruction lo.
                     AddressingModeInProgress = true;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = Read(Pc);
+                    Pc++;
                     break;
-                }
-                case 1:
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                case 1: //Cycle 2 perform a read, getting instruction hi
+                    InstructionHiByte = Read(Pc);
+                    Pc++;
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     break;
                 case 2:
-                    InstructionHiByte = DataBusData;
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress  = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins(AddressBusAddress);
-                    AddressBusAddress = TempAddress;
+                    _operand = Read(AddressBusAddress);
                     AddressingModeInProgress = false;
                     break;
             }
-
+            
             _addressingModeCycles++;
         }
 
@@ -465,59 +655,115 @@ namespace Poly6502.Microprocessor
         {
             switch (_addressingModeCycles)
             {
-                case (0):
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                case 0:
+                    AddressBusAddress = Read(Pc++);
                     break;
-                case (1):
-                    InstructionLoByte = DataBusData;
-                    OutputAddressToPins(InstructionLoByte);
+                case 1:
+                    _operand = Read(AddressBusAddress);
                     AddressingModeInProgress = false;
                     break;
             }
-
+            
             _addressingModeCycles++;
         }
 
         /// <summary>
         /// Zero Page Addressing with X offset.
         ///
-        /// 
+        ///  Should take 4 cycles https://www.nesdev.org/wiki/CPU_addressing_modes
         /// </summary>
         public void ZPX()
         {
             switch (_addressingModeCycles)
             {
-                case (0):
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                case 0: //Cycle 1 Read 
+                    AddressBusAddress = Read((ushort)(Pc));
+                    AddressBusAddress += X;
+                    Pc++;
+                    AddressBusAddress &= 0xFF;
                     break;
-                case (1):
-                    InstructionLoByte = (byte) (DataBusData + X);
-                    OutputAddressToPins((ushort) ((InstructionLoByte) & 0x00FF));
+                case 1:
+                    _operand = Read(AddressBusAddress);
+                    break;
+                case 2:
                     AddressingModeInProgress = false;
                     break;
             }
+            
+            _addressingModeCycles++;
+        }
+
+        /// <summary>
+        /// operand is zero page address; effective address is address incremented by Y without carry
+        ///
+        /// The available 16-bit address space is conceived as consisting of pages of 256 bytes each, with
+        /// address hi-bytes representing the page index. An increment with carry may affect the hi-byte
+        /// and may thus result in a crossing of page boundaries, adding an extra cycle to the execution.
+         /// Increments without carry do not affect the hi-byte of an address and no page transitions do occur.
+         /// Generally, increments of 16-bit addresses include a carry, increments of zeropage addresses don't.
+         /// Notably this is not related in any way to the state of the carry bit of the accumulator.
+         ///
+         /// Should Take 4 Cycles.
+         /// </summary>
+         public void ZPY()
+         {
+             switch (_addressingModeCycles)
+             {
+                 case (0): //Cycle 1 Read Lo Byte
+                     AddressBusAddress = Read(Pc);
+                     AddressBusAddress += Y;
+                     Pc++;
+
+                     AddressBusAddress &= 0x00FF;
+                     Read(AddressBusAddress);
+                     AddressingModeInProgress = false;
+                     break;
+             }
 
             _addressingModeCycles++;
         }
 
-        public void ZPY()
+        /// <summary>
+        /// Index Absolute Addressing
+        ///
+        /// (X, Y indexing) — This form of addressing  is used  in  conjunction with
+        /// X and Y index register and is  referred to as "Absolute, X,"
+        /// and "Absolute, Y." The effective address  is formed  by adding the
+        /// contents of X and Y to the address  contained  in  the second and third
+        /// bytes of the instruction. This mode allows the index register to contain the
+        /// index or count value and the instruction to contain  the base address.
+        ///
+        /// This type of indexing  allows any location  referencing and the index to
+        /// modify multiple fields  resulting  in  reduced coding and execution time.
+        ///
+        /// Should take 4+ (boundary crossing) Cycles https://www.nesdev.org/wiki/CPU_addressing_modes
+        /// </summary>
+        public void ABY()
         {
             switch (_addressingModeCycles)
             {
-                case (0):
-                {
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                case 0: //set the address bus to get the lo byte of the address
+                    InstructionLoByte = Read(Pc);
+                    Pc++;
                     break;
-                }
-                case (1):
-                {
-                    OutputAddressToPins((ushort) ((DataBusData + Y) & 0x00FF));
+                case 1:
+                    InstructionHiByte = Read(Pc);
+                    Pc++;
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    AddressBusAddress += Y;
+                    break;
+                case 2:
+                    _operand = Read(AddressBusAddress);
+                    
+                    if (!BoundaryCrossed())
+                    {
+                        AddressingModeInProgress = false;
+                    }
+                    
+                    break;
+                case 3: //boundary crossing penalty
                     AddressingModeInProgress = false;
                     break;
-                }
             }
             
             _addressingModeCycles++;
@@ -535,71 +781,36 @@ namespace Poly6502.Microprocessor
         ///
         /// This type of indexing  allows any location  referencing and the index to
         /// modify multiple fields  resulting  in  reduced coding and execution time.
-        /// </summary>
-        public void ABY()
-        {
-            switch (_addressingModeCycles)
-            {
-                case 0: //set the address bus to get the lo byte of the address
-                {
-                    BeginOpCode();
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    break;
-                }
-                case 1:
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    break;
-                case 2:
-                    InstructionHiByte = DataBusData;
-                    ushort address = (ushort) ((ushort) ((InstructionHiByte << 8 | InstructionLoByte)) + Y);
-                    OutputAddressToPins(address);
-                    AddressingModeInProgress = false;
-                    break;
-            }
-
-            _addressingModeCycles++;
-        }
-
-        /// <summary>
-        /// Index Absolute Addressing
         ///
-        /// (X, Y indexing) — This form of addressing  is used  in  conjunction with
-        /// X and Y index register and is  referred to as "Absolute, X,"
-        /// and "Absolute, Y." The effective address  is formed  by adding the
-        /// contents of X and Y to the address  contained  in  the second and third
-        /// bytes of the instruction. This mode allows the index register to contain the
-        /// index or count value and the instruction to contain  the base address.
-        ///
-        /// This type of indexing  allows any location  referencing and the index to
-        /// modify multiple fields  resulting  in  reduced coding and execution time.
+        /// Should take 4+ (boundary crossing) cycles. https://www.nesdev.org/wiki/CPU_addressing_modes
         /// </summary>
         public void ABX()
         {
             switch (_addressingModeCycles)
             {
                 case 0: //set the address bus to get the lo byte of the address
-                {
-                    BeginOpCode();
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = Read(Pc);
+                    Pc++;
                     break;
-                }
                 case 1:
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionHiByte = Read(Pc);
+                    Pc++;
+                    AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + X);
                     break;
                 case 2:
-                    InstructionHiByte = DataBusData;
-                    ushort address = (ushort) ((ushort) ((InstructionHiByte << 8 | InstructionLoByte)) + X);
-                    OutputAddressToPins(address);
+                    _operand = Read(AddressBusAddress);
+                    
+                    if (!BoundaryCrossed())
+                    {
+                        AddressingModeInProgress = false;
+                    }
+                    
+                    break;
+                case 3: //boundary crossing penalty
                     AddressingModeInProgress = false;
                     break;
             }
-
+            
             _addressingModeCycles++;
         }
 
@@ -618,19 +829,18 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case 0:
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    RelativeAddress = DataBusData;
-                    
+                    RelativeAddress = Read(Pc);
+                    Pc++;
+
                     if ((RelativeAddress & 0x80) != 0)
                     {
-                        RelativeAddress = (ushort) (DataBusData | 0xFF00);
+                        RelativeAddress |= 0xFF00;
                     }
+
                     AddressingModeInProgress = false;
+                    AddressBusAddress = Pc;
                     break;
             }
-
-            _addressingModeCycles++;
         }
 
         /// <summary>
@@ -645,6 +855,8 @@ namespace Poly6502.Microprocessor
         /// The next memory location  in  page zero contains the high order eight bits of the
         /// effective address. Both memory locations specifying the  high and  low order
         /// bytes of the effective address  must be in  page zero.
+        ///
+        /// Should take 6 Cycles. https://www.nesdev.org/wiki/CPU_addressing_modes
         /// </summary>
         public void IZX()
         {
@@ -652,31 +864,28 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    _offset = Read(Pc);
+                    Pc++;
                     break;
                 }
                 case (1):
                 {
-                    _offset = DataBusData;
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort) ((_offset + (X)) & 0x00FF);
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = Read((ushort)((_offset + (X)) & 0xFF));
                     break;
                 }
                 case (2):
                 {
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress = (ushort) ((_offset + (X + 1)) & 0x00FF);
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionHiByte = Read((ushort)((_offset + X + 1) & 0xFF));
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     break;
                 }
                 case (3):
                 {
-                    InstructionHiByte = DataBusData;
-                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins((ushort) (AddressBusAddress));
-                    AddressBusAddress = TempAddress;
+                    _operand = Read(AddressBusAddress);
+                    break;
+                }
+                case (4):
+                {
                     AddressingModeInProgress = false;
                     break;
                 }
@@ -688,68 +897,56 @@ namespace Poly6502.Microprocessor
         /// <summary>
         /// Indirect Indexed Addressing
         ///
-        /// n  indirect indexed addressing (referred to as [Indirect. Y[).
+        /// n  indirect indexed addressing (referred to as [Indirect. Y]).
         /// the second byte of the instruction  points to a  memory location  in page zero.
         /// The contents of this  memory location  is added to the contents of the Y index
         /// register, the result being the low order eight bits of the effective address.
         ///
         /// The carry from this addition  is added  to the contents of the next page zero
         /// memory location, the result being the high order eight bits of the effective address.
+        ///
+        /// Should take 5+ Cycles
         /// </summary>
         public void IZY()
         {
             switch (_addressingModeCycles)
             {
                 case (0):
-                {
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    TempAddress = Read(Pc);
+                    Pc++;
                     break;
-                }
+                
                 case (1):
-                {
-                    _offset = DataBusData;
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort) ((_offset) & 0x00FF);
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = Read((ushort)(TempAddress & 0xFF));
                     break;
-                }
-                case (2):
-                {
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress = (ushort) ((_offset + 1) & 0x00FF);
-                    OutputAddressToPins(AddressBusAddress);
+                case 2:
+                    InstructionHiByte = Read((ushort)((TempAddress + 1) & 0xFF));
+                    
+                    AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + Y);
+                    
                     break;
-                }
-                case (3):
-                {
-                    InstructionHiByte = DataBusData;
-                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins((ushort) (AddressBusAddress + Y));
-                    AddressBusAddress = TempAddress;
+                case 3: //boundary crossing penalty
+                    _operand = Read(AddressBusAddress);
+                    
+                    if (!BoundaryCrossed())
+                    {
+                        AddressingModeInProgress = false;
+                    }
+                    break;
+                case 4:
                     AddressingModeInProgress = false;
                     break;
-                }
             }
 
             _addressingModeCycles++;
         }
 
-        /// <summary>
-        /// Absolute Indirect
-        ///
-        /// The second byte of the instruction contains the low order eight bits of a memory location.
-        /// The  high order eight bits of that memory location  is contained  in  the third byte of the instruction.
-        /// The contents of the fully specified  memory location  is the low order byte of the effective address.
-        /// The  next memory location contains the high  order byte of the effective address which
-        /// is loaded  into the sixteen  bits of the program counter.
-        /// </summary>
-        public void ABI()
-        {
-        }
 
         /// <summary>
         /// Indirect Addressing
+        ///
+        /// This addressing mode reads from the address supplied after the opcode.
+        /// this address is then read from to retrieve the opeand
         ///
         /// </summary>
         public void IND()
@@ -757,31 +954,32 @@ namespace Poly6502.Microprocessor
             switch (_addressingModeCycles)
             {
                 case 0:
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionLoByte = Read(Pc);
+                    Pc++;
                     break;
                 case 1:
-                    InstructionLoByte = DataBusData;
-                    AddressBusAddress++;
-                    
-                    OutputAddressToPins(AddressBusAddress);
+                    InstructionHiByte = Read(Pc);
+                    Pc++;
                     break;
                 case 2:
-                    InstructionHiByte = DataBusData;
-                    TempAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    
-                    OutputAddressToPins(TempAddress);
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
                     break;
                 case 3:
-                    if(InstructionLoByte == 0x00FF)
-                        OutputAddressToPins((ushort) (TempAddress & 0xFF00));
+                    if (InstructionLoByte == 0x00FF)
+                    {
+                        ushort temp = (ushort) ((Read((ushort)(AddressBusAddress & 0xFF00)) << 8) 
+                                              | Read((ushort)(AddressBusAddress + 0)));
+                        
+                        AddressBusAddress = temp;
+                    }
                     else
-                        OutputAddressToPins((ushort) (TempAddress + 1));
-                    InstructionLoByte = DataBusData;
-                    break;
-                case 4:
-                    InstructionHiByte = DataBusData;
+                    {
+                        ushort temp = (ushort) ((Read((ushort)(AddressBusAddress + 1)) << 8) 
+                                                | Read((ushort)(AddressBusAddress + 0)));
+                        
+                        AddressBusAddress = temp;
+                    }
+
                     AddressingModeInProgress = false;
                     break;
             }
@@ -794,16 +992,85 @@ namespace Poly6502.Microprocessor
         #region Instruction Set
 
         /// <summary>
-        /// Add Memory to Accumulator with carry
+        /// freeze the CPU.
+        /// The processor will be trapped infinitely in
+        /// T1 phase with $FF on the data bus.
+        ///
+        /// call to <see cref="RES"/> required.
         /// </summary>
-        public void ADS()
+        public void JAM()
         {
+            OpCodeInProgress = true;
+            AddressingModeInProgress = false;
         }
 
         /// <summary>
-        /// AND Memory with Accumulator
+        /// Stores A AND X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        ///
         /// </summary>
-        public void AND()
+        [Unstable]
+        public void SHA()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Puts A AND X in SP and stores A AND X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        [Unstable]
+        public void TAS()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// LDA/TSX oper
+        /// </summary>
+        public void LAS()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Store * AND oper in A and X
+        /// Highly unstable, involves a 'magic' constant, <see cref="ANE"/>
+        /// </summary>
+        [HighlyUnstable]
+        public void LXA()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Stores X AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        [Unstable]
+        public void SHX()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// Stores Y AND (high-byte of addr. + 1) at addr.
+        /// unstable: sometimes 'AND (H+1)' is dropped, page boundary crossings may not work
+        /// (with the high-byte of the value used as the high-byte of the address)
+        /// </summary>
+        [Unstable]
+        public void SHY()
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// AND operation + set C as ASL
+        /// </summary>
+        public void ANC()
         {
             BeginOpCode();
 
@@ -816,55 +1083,175 @@ namespace Poly6502.Microprocessor
                 }
                 case (1):
                 {
-                    A = (byte) (A & DataBusData);
+                    A = (byte)(A & DataBusData);
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.C, P.HasFlag(StatusRegisterFlags.N));
                     AddressBusAddress++;
+                    break;
+                }
+                case (2):
+                {
                     EndOpCode();
                     break;
                 }
             }
         }
 
+        public void ANC2()
+        {
+            BeginOpCode();
+
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte)(A & DataBusData);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.C, P.HasFlag(StatusRegisterFlags.N));
+                    AddressBusAddress++;
+                    break;
+                }
+                case (2):
+                {
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+
+
         /// <summary>
-        /// Shift left One Bit (Memory or Accumulator)
+        /// AND (bitwise AND with accumulator)
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
+        /// </summary>
+        public void AND()
+        {
+            A = (byte)(A & _operand);
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            
+            EndOpCode();
+        }
+
+        /// <summary>
+        /// ASL (Arithmetic Shift Left)
+        ///
+        /// ASL shifts all the bits left one position. 0 is shifted into bit 0
+        /// and the original bit 7 is shifted into <see cref="StatusRegisterFlags.C"/>
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ASL()
         {
-            switch (_instructionCycles)
+            var data = _operand;
+            int result = (data << 1);
+
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
+
+            if (OpCode == 0x0A) //Hacky McHack
             {
-                case (0):
+                A = (byte)result;
+            }
+            else
+            {
+                switch (_instructionCycles)
                 {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var result = DataBusData << 1;
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
-
-                    if (OpCode == 0x0A)
-                        A = (byte) result;
-                    else
-                    {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
+                    case 0:
+                        UpdateRw(false);
+                        SetData((byte)result); //this is an extra instruction cycle.
+                        return;
+                    case 1:
                         OutputDataToDatabus();
-                    }
-
-
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
+                        _instructionCycles++;
+                        return;
                 }
             }
+            
+            EndOpCode();
         }
 
-        public void ADC()
+        /// <summary>
+        /// This operation involves the adder:
+        /// V-flag is set according to (A AND oper) + oper
+        /// The carry is not set, but bit 7 (sign) is exchanged with the carry
+        /// </summary>
+        public void ARR()
         {
             switch (_instructionCycles)
             {
@@ -876,49 +1263,203 @@ namespace Poly6502.Microprocessor
                 }
                 case (1):
                 {
-                    var result = A + DataBusData + (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
-                    var overflow = ((A ^ result) & (DataBusData ^ result) & 0x80) != 0;
-                    A = (byte) result;
+                    A = (byte)(A & DataBusData);
 
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.C, result > byte.MaxValue);
-                    P.SetFlag(StatusRegisterFlags.V, overflow);
+                    var result = (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0) << 7 | A >> 1;
+
+                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
+                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & (1 << 5)) != 0);
+                    P.SetFlag(StatusRegisterFlags.V, ((DataBusData & (1 << 5)) ^ ((DataBusData & (1 << 4)))) != 0);
+
+                    if (OpCode == 0x6A)
+                        A = (byte)result;
+                    else
+                    {
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
+                        OutputDataToDatabus();
+                    }
 
                     AddressBusAddress++;
                     EndOpCode();
-
                     break;
                 }
             }
         }
 
         /// <summary>
-        /// Branch on Carry Clear
+        /// ANE - AND X + AND oper.
+        /// 
+        /// Highly unstable, do not use.
+        /// A base value in A is determined based on the contents of A and a constant,
+        /// which may be typically $00, $ff, $ee, etc. The value of this constant depends on
+        /// temperature, the chip series, and maybe other factors, as well.
+        /// In order to eliminate these uncertainties from the equation,
+        /// use either 0 as the operand or a value of $FF in the accumulator.
+        /// </summary>
+        [HighlyUnstable]
+        public void ANE()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void ALR()
+        {
+            switch (_instructionCycles)
+            {
+                case (0):
+                {
+                    BeginOpCode();
+                    _instructionCycles++;
+                    break;
+                }
+                case (1):
+                {
+                    A = (byte)(A & DataBusData);
+                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+                    AddressBusAddress++;
+                    _instructionCycles++;
+                    break;
+                }
+                case (3):
+                {
+                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
+                    var result = DataBusData >> 1;
+                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
+                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+
+                    if (OpCode == 0x4A)
+                        A = (byte)result;
+                    else
+                    {
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
+                        OutputDataToDatabus();
+                    }
+
+                    AddressBusAddress++;
+                    EndOpCode();
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// ADC (ADd with Carry)
+        /// 
+        /// ADC results are depending on the settings of the <see cref="StatusRegisterFlags.D"/> flag.
+        ///
+        /// In decimal mode, addition is carried out on the assumption that the values involved are packed BCD
+        /// (Binary Coded Decimal).
+        ///
+        /// There is no way to add without carry.
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
+        /// </summary>
+        public void ADC()
+        {
+            BeginOpCode();
+
+            byte data = _operand;
+
+            var result = A + data + (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
+            var overflow = (~(A ^ data) & (data ^ result) & 0x80) != 0;
+            A = (byte)result;
+
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.C, result > byte.MaxValue);
+            P.SetFlag(StatusRegisterFlags.V, overflow);
+
+            EndOpCode();
+        }
+
+        /// <summary>
+        /// BCC - Branch on Carry Clear
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BCC()
         {
+            BeginOpCode();
+
             if (!P.HasFlag(StatusRegisterFlags.C))
             {
-                AddressBusAddress += DataBusData;
-                OutputAddressToPins(AddressBusAddress);
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
+                Read(AddressBusAddress);
             }
 
             AddressBusAddress++;
 
-            OpCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
-        /// Branch on Carry Set
+        /// BCS - Branch on Carry Set
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BCS()
         {
+            BeginOpCode();
+
             if (P.HasFlag(StatusRegisterFlags.C))
             {
-                AddressBusAddress++;
-                AddressBusAddress += DataBusData;
-                OutputAddressToPins(AddressBusAddress);
+                Pc += DataBusData;
+                Read(AddressBusAddress);
             }
             else
             {
@@ -929,14 +1470,24 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result Zero
+        /// BEQ - Branch on Result Zero
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BEQ()
         {
+            BeginOpCode();
+
             if (P.HasFlag(StatusRegisterFlags.Z))
             {
-                AddressBusAddress += DataBusData;
-                OutputAddressToPins(AddressBusAddress);
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
+                Read(AddressBusAddress);
             }
 
             AddressBusAddress++;
@@ -946,35 +1497,54 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Test Bits in Memory with Accumulator
+        /// BIT (test BITs).
+        ///
+        /// BIT sets the <see cref="StatusRegisterFlags.Z"/> flag as through the value
+        /// in the address tested were <see cref="AND"/> with the accumulator.
+        ///
+        /// The <see cref="StatusRegisterFlags.N"/> and <see cref="StatusRegisterFlags.V"/> flags are
+        /// set to match bits 7 and 6 respectively in the value stored at the tested address.
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BIT()
         {
             BeginOpCode();
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    OutputAddressToPins((ushort) (InstructionHiByte << 8 | InstructionLoByte));
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    byte temp = (byte) (A & DataBusData);
-                    P.SetFlag(StatusRegisterFlags.Z, (temp & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (DataBusData & (1 << 7)) != 0);
-                    P.SetFlag(StatusRegisterFlags.V, (DataBusData & (1 << 6)) != 0);
+            Read(AddressBusAddress);
 
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            byte temp = (byte)(A & DataBusData);
+            P.SetFlag(StatusRegisterFlags.Z, (temp & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.N, (DataBusData & (1 << 7)) != 0);
+            P.SetFlag(StatusRegisterFlags.V, (DataBusData & (1 << 6)) != 0);
+
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /// <summary>
-        /// Branch on Result Minus
+        /// BMI - Branch on Result Minus
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BMI()
         {
@@ -982,16 +1552,26 @@ namespace Poly6502.Microprocessor
 
             if (P.HasFlag(StatusRegisterFlags.N))
             {
-                AddressBusAddress += DataBusData;
+                var temp = Pc + RelativeAddress;
+
+                if ((temp & 0xFF00) != (Pc & 0xFF00)) ;
+                    //this should cause an extra cycle?
+
+                Pc = (ushort) temp;
             }
-
-            AddressBusAddress++;
-
+            
             EndOpCode();
         }
 
         /// <summary>
-        /// Branch on Result not Zero
+        /// BNE - Branch on Result not Zero
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BNE()
         {
@@ -999,6 +1579,8 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
+
                     if (!P.HasFlag(StatusRegisterFlags.Z))
                     {
                         var absolute = AddressBusAddress + RelativeAddress;
@@ -1009,8 +1591,8 @@ namespace Poly6502.Microprocessor
                         }
                         else
                         {
-                            AddressBusAddress = (ushort) absolute;
-                            AddressBusAddress++;
+                            AddressBusAddress = (ushort)absolute;
+                            Pc = AddressBusAddress;
                             EndOpCode();
                         }
                     }
@@ -1019,6 +1601,7 @@ namespace Poly6502.Microprocessor
                         AddressBusAddress++;
                         EndOpCode();
                     }
+
                     break;
                 }
                 case (1):
@@ -1032,7 +1615,14 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Branch on Result Plus
+        /// BPL - Branch on Result Plus
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BPL()
         {
@@ -1040,162 +1630,227 @@ namespace Poly6502.Microprocessor
 
             if (!P.HasFlag(StatusRegisterFlags.N))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + RelativeAddress);
+                Pc = AddressBusAddress;
             }
 
-            AddressBusAddress++;
-            OutputAddressToPins(AddressBusAddress);
             EndOpCode();
         }
 
-        /// <summary>
-        /// Force Break
-        /// </summary>
+        /// <Summary>
+        /// BRK (BReaK)
+        ///
+        ///
+        /// BRK causes a non-maskable interrupt and increments the program counter
+        /// by 1.
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.B"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
+        /// 
+        /// </Summary>
         public void BRK()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
-                /*
-                 * Tell everyone we are writing to the data bus
-                 * set the address bus to address on the stack.
-                 * Write the hi byte of the program counter to the data bus
-                 * decrement stack pointer for next operation
-                 */
                 case (0):
-                    CpuRead = false;
-                    UpdateRw();
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
-                    DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
+                    BeginOpCode();
+                    UpdateRw(false);
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
+                    DataBusData = (byte)((AddressBusAddress >> 8) & 0x00FF);
                     SP--;
 
                     //enable interrupt because we are in a software break.
                     P.SetFlag(StatusRegisterFlags.I, true);
+
+                    _instructionCycles++;
                     break;
-                /*
-                 * Set the address bus to the address on the stack.
-                 * Write the lo byte of the program counter to the data bus
-                 * decrement the stack pointer for next operation
-                 * 
-                 */
                 case (1):
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
-                    DataBusData = (byte) (AddressBusAddress & 0x00FF);
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
+                    DataBusData = (byte)(AddressBusAddress & 0x00FF);
                     SP--;
+
+                    _instructionCycles++;
                     break;
-                /*
-                 * Set the address bus to the address on the stack
-                 * Write the current status register to the data bus
-                 * decrement the stack pointer for next operation
-                 */
                 case (2):
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
-                    DataBusData = (byte) P.Register;
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
+                    DataBusData = (byte)P.Register;
                     P.SetFlag(StatusRegisterFlags.B, true);
                     SP--;
+
+                    _instructionCycles++;
                     break;
-                /*
-                 * Tell everyone we now want to read
-                 * Set the address bus to address 0xFFFE
-                 */
                 case (3):
-                    CpuRead = true;
-                    UpdateRw();
+                    UpdateRw(true);
                     AddressBusAddress = 0xFFFE;
-                    OutputAddressToPins(AddressBusAddress);
+                    Read(AddressBusAddress);
+
+                    _instructionCycles++;
                     break;
-                /*
-                 * read the data from the databus into the PC.
-                 * Set the address bus to address 0xFFFF
-                 */
                 case (4):
                     AddressBusAddress = 0x0000;
                     AddressBusAddress = DataBusData;
                     AddressBusAddress = 0xFFFF;
-                    OutputAddressToPins(AddressBusAddress);
+                    Read(AddressBusAddress);
+
+                    _instructionCycles++;
                     break;
-                /*
-                 * Read the data bus into the hi byte of the PC
-                 * Opcode Complete
-                 */
                 case (5):
-                    AddressBusAddress = (ushort) (DataBusData << 8);
+                    AddressBusAddress = (ushort)(DataBusData << 8);
                     P.SetFlag(StatusRegisterFlags.B, false);
+
+                    _instructionCycles++;
+
                     EndOpCode();
                     break;
             }
-
-            _instructionCycles++;
         }
 
         /// <summary>
-        /// Branch on Overflow Clear
+        /// BVC - Branch on Overflow Clear
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BVC()
         {
+            BeginOpCode();
+
             if (!P.HasFlag(StatusRegisterFlags.V))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
             }
-
-            AddressBusAddress++;
-
-
-            OutputAddressToPins(AddressBusAddress);
+            
+            Read(AddressBusAddress);
             EndOpCode();
         }
 
         /// <summary>
-        /// Branch on Overflow Set
+        /// BVS - Branch on Overflow Set
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Relative Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void BVS()
         {
+            BeginOpCode();
+
             if (P.HasFlag(StatusRegisterFlags.V))
             {
-                AddressBusAddress += DataBusData;
+                AddressBusAddress = (ushort) (Pc + DataBusData);
+                Pc = AddressBusAddress;
             }
 
             AddressBusAddress++;
 
-            OutputAddressToPins(AddressBusAddress);
+            Read(AddressBusAddress);
             EndOpCode();
         }
 
         /// <summary>
-        /// Clear Carry Flag
+        /// CLC (CLear Carry)
+        /// 
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLC()
         {
+            BeginOpCode();
             P.SetFlag(StatusRegisterFlags.C, false);
             AddressBusAddress++;
             OpCodeInProgress = false;
-        }
-
-        /// <summary>
-        /// Clear Decimal Mode
-        /// </summary>
-        public void CLD()
-        {
-            P.SetFlag(StatusRegisterFlags.D, false);
-            AddressBusAddress++;
-            OutputAddressToPins(AddressBusAddress);
             EndOpCode();
         }
 
         /// <summary>
-        /// Clear Interrupt Disable Bit
+        /// CLD (CLear Decimal)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.D"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
-        public void CLI()
+        public void CLD()
         {
-            P.SetFlag(StatusRegisterFlags.I, false);
+            BeginOpCode();
+            P.SetFlag(StatusRegisterFlags.D, false);
+            AddressBusAddress++;
+            Read(AddressBusAddress);
+            EndOpCode();
         }
 
         /// <summary>
-        /// Clear Overflow Flag
+        /// CLI (CLear Interrupt)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.I"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
+        /// </summary>
+        public void CLI()
+        {
+            BeginOpCode();
+            P.SetFlag(StatusRegisterFlags.I, false);
+            EndOpCode();
+        }
+
+        /// <summary>
+        /// CLV (CLear oVerflow)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CLV()
         {
@@ -1206,132 +1861,219 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Compare Memory and Accumulator 
+        /// CMP (CoMPare accumulator)
+        ///
+        /// Compare sets flags as if a subtraction had been carried out. If the value in the
+        /// accumulator is >= the compared value, the <see cref="StatusRegisterFlags.C"/> flag will be set.
+        ///
+        /// The <see cref="StatusRegisterFlags.Z"/> and <see cref="StatusRegisterFlags.N"/> flags will be set based
+        /// on equality or lack thereof and the sign of the accumulator.
+        ///  
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CMP()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    int comparison = (byte) (A - DataBusData);
-                    if (comparison is < 0 or > byte.MaxValue)
-                        comparison = 0;
 
-                    P.SetFlag(StatusRegisterFlags.C, A >= DataBusData);
-                    P.SetFlag(StatusRegisterFlags.Z, (comparison & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (comparison & 0x0080) != 0);
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    EndOpCode();
-                    break;
-                }
-            }
+            int comparison = (byte)(A - DataBusData);
+            if (comparison is < 0 or > byte.MaxValue)
+                comparison = 0;
+
+            P.SetFlag(StatusRegisterFlags.C, A >= DataBusData);
+            P.SetFlag(StatusRegisterFlags.Z, (comparison & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.N, (comparison & 0x0080) != 0);
+            AddressBusAddress++;
+            Read(AddressBusAddress);
+            EndOpCode();
         }
 
 
         /// <summary>
-        /// Compare Memory and Index X
+        /// CPX (ComPare X register)
+        ///
+        /// The compare X register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CPX()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var result = X - DataBusData;
-                    P.SetFlag(StatusRegisterFlags.C, X >= DataBusData);
-                    P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x0080) != 0);
+            var result = X - DataBusData;
+            P.SetFlag(StatusRegisterFlags.C, X >= DataBusData);
+            P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x0080) != 0);
 
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /// <summary>
-        /// Compare Memory and Index Y
+        /// CPY (ComPare Y register)
+        ///
+        /// The compare Y register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        ///
+        /// </remarks>
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void CPY()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    BeginOpCode();
+            var result = Y - DataBusData;
 
-                    var result = Y - DataBusData;
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.C, Y >= DataBusData);
 
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.C, Y >= DataBusData);
+            AddressBusAddress++;
 
-                    AddressBusAddress++;
-
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
         /// <summary>
-        /// Decrement Memory by 1
+        /// DEC (DECrement memory)
+        ///
+        /// The compare X register operation and flag results
+        /// are identical to the equivalent <see cref="CMP"/> operations
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEC()
         {
             switch (_instructionCycles)
             {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var data = DataBusData - 1;
-                    
+                case 0:
+                    var data = (byte)(DataBusData - 1);
+                    DataBusData = data;
                     P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
                     P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
-                    
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData =  (byte) (data & 0x00FF);
+                    UpdateRw(false);
+                    _instructionCycles++;
+                    break;
+                case 1:
+                    DataBusData = (byte)(DataBusData & 0x00FF);
                     OutputDataToDatabus();
-
+                    _instructionCycles++;
+                    break;
+                case 2:
                     AddressBusAddress++;
                     EndOpCode();
                     break;
-                }
             }
         }
 
         /// <summary>
-        /// Decrement Index X by 1
+        /// DEX (DEcrement X)
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEX()
         {
-            BeginOpCode();
-
             X--;
             P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, X == 0);
@@ -1341,12 +2083,17 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Decrement Index Y by 1
+        /// DEY (DEcrement Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void DEY()
         {
-            BeginOpCode();
-
             Y--;
             P.SetFlag(StatusRegisterFlags.N, (Y & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, Y == 0);
@@ -1356,72 +2103,116 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Exclusive OR Memory with Accumulator
+        /// EOR (bitwise Exclusive OR)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void EOR()
         {
-            BeginOpCode();
+            A ^= DataBusData;
 
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    A ^= DataBusData;
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            AddressBusAddress++;
 
-                    AddressBusAddress++;
-
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
         /// <summary>
-        /// Increment Memory by 1
+        /// INC (INCrement memory)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INC()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var data = (DataBusData + 1);
-                    P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
+            var data = (DataBusData + 1);
+            P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
 
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData = (byte) (data & 0x00FF);
-                    OutputDataToDatabus();
+            UpdateRw(false);
+            DataBusData = (byte)(data & 0x00FF);
+            OutputDataToDatabus();
 
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /// <summary>
-        /// Increment Index X by 1
+        /// INX (INcrement X)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INX()
         {
-            BeginOpCode();
-
             X++;
             P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, X == 0);
@@ -1431,12 +2222,17 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Increment Index Y by 1
+        /// INY (INcrement Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void INY()
         {
-            BeginOpCode();
-
             Y++;
 
             P.SetFlag(StatusRegisterFlags.N, (Y & 0x80) != 0);
@@ -1447,21 +2243,44 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Jump to New Location
+        /// JMP (JuMP)
         ///
-        /// 3 cycles
+        /// JMP transfers program execution to the following address (absolute) or to the
+        /// location contained in the following address (indirect).
+        ///
+        /// Note that there is no carry associated with the indirect jump.
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void JMP()
         {
-            AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-            OutputAddressToPins(AddressBusAddress);
+            BeginOpCode();
+            Pc = AddressBusAddress;
             EndOpCode();
-
         }
 
         /// <summary>
-        /// Jump to New Location
-        /// Saving Return Address
+        /// JSR (Jump to SubRoutine)
+        /// 
+        /// JSR pushes (address - 1) of the next operation on to the stack before
+        /// transferring program control to the following address.
+        ///
+        /// Subroutines are normally terminated by the <see cref="RTS"/> opcode.
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void JSR()
         {
@@ -1469,190 +2288,310 @@ namespace Poly6502.Microprocessor
             {
                 case (0):
                 {
+                    BeginOpCode();
+                    _instructionCycles++;
                     break;
                 }
                 case (1): //store the hi byte
-                    CpuRead = false;
-                    UpdateRw();
-                    OutputAddressToPins((ushort) (0x0100 + SP));
-                    DataBusData = (byte) ((AddressBusAddress >> 8) & 0x00FF);
-                    OutputDataToDatabus();
+                    UpdateRw(false);
+                    Pc--;
+                    DataBusData = (byte) ((Pc >> 8) & 0x00FF);
+                    OutputDataToDatabus((ushort)(0x0100 | SP));
                     SP--;
+                    _instructionCycles++;
                     break;
                 case (2): //store the lo byte
-                    CpuRead = false;
-                    UpdateRw();
-                    OutputAddressToPins((ushort) (0x0100 + SP));
-                    DataBusData = (byte) ((AddressBusAddress & 0x00FF));
+                    UpdateRw(false);
+                    Pc--;
+                    DataBusData = (byte) (Pc + 1 & 0x00FF);
+                    OutputDataToDatabus((ushort)(0x0100 | SP));
                     SP--;
+                    _instructionCycles++;
                     break;
                 case (3):
-                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins(AddressBusAddress);
-                    OpCodeInProgress = false;
+                    Pc = AddressBusAddress;
+                    Read(AddressBusAddress);
+                    EndOpCode();
                     break;
             }
-
-            _instructionCycles++;
         }
 
         /// <summary>
-        /// Load the Accumulator with Memory
+        /// LDA (LoaD Accumulator)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term> 
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDA()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    A = DataBusData;
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            BeginOpCode();
+            
+            A = _operand;
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
         /// <summary>
-        /// Load Index X with Memory
+        /// LDX (LoaD X register)
+        /// 
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, Y: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDX()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    X = DataBusData;
-                    AddressBusAddress++;
+            X = DataBusData;
+            AddressBusAddress++;
 
-                    P.SetFlag(StatusRegisterFlags.Z, X == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, X == 0);
+            P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
 
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
         /// <summary>
-        /// Load Index Y with Memory
+        /// LDY (Load Y register)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LDY()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    Y = DataBusData;
-                    AddressBusAddress++;
+            Y = DataBusData;
+            AddressBusAddress++;
 
-                    P.SetFlag(StatusRegisterFlags.Z, Y == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (Y & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, Y == 0);
+            P.SetFlag(StatusRegisterFlags.N, (Y & 0x80) != 0);
 
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
         /// <summary>
-        /// Shift 1 bit right (Memory or Accumulation)
+        /// LSR (Logical Shift Right)
+        /// 
+        /// LSR shifts all bits right 1 position.
+        /// 0 is shifted into bit 7 and the original bit 0 is shifted
+        /// into <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void LSR()
         {
-            switch (_instructionCycles)
+            P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
+            var result = DataBusData >> 1;
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+
+            if (OpCode == 0x4A)
+                A = (byte)result;
+            else
             {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
-                    var result = DataBusData >> 1;
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-
-                    if (OpCode == 0x4A)
-                        A = (byte) result;
-                    else
-                    {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
-                        OutputDataToDatabus();
-                    }
-
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
+                UpdateRw(false);
+                DataBusData = (byte)result;
+                OutputDataToDatabus();
             }
+
+            AddressBusAddress++;
+            
+            EndOpCode();
         }
 
 
         /// <summary>
-        /// No Operation
+        /// NOP (No Operation)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void NOP()
         {
             OpCodeInProgress = false;
             AddressBusAddress++;
 
-            OutputAddressToPins(AddressBusAddress);
+            Read(AddressBusAddress);
 
             EndOpCode();
         }
 
         /// <summary>
-        /// OR Memory with Accumulator
+        /// ORA (bitwise OR with Accumulator)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ORA()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    A = (byte) (A | DataBusData);
+            A = (byte)(A | DataBusData);
 
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
-                    AddressBusAddress++;
+            AddressBusAddress++;
 
-                    EndOpCode();
-                    break;
-                }
-            }
+            EndOpCode();
         }
 
 
@@ -1661,21 +2600,25 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PHA()
         {
-            BeginOpCode();
             switch (_instructionCycles)
             {
                 case (0):
-                    CpuRead = false;
-                    UpdateRw();
-                    OutputAddressToPins((ushort) (SP + 0x0100));
-                    DataBusData = A;
-                    OutputDataToDatabus();
+                {
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
+                }
                 case (1):
+                    BeginOpCode();
+                    UpdateRw(false);
+                    DataBusData = A;
+                    OutputDataToDatabus((ushort)(SP | 0x0100));
+                    _instructionCycles++;
+                    break;
+                case (2):
                     SP--;
                     AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    Read(AddressBusAddress);
                     EndOpCode();
                     break;
             }
@@ -1688,29 +2631,24 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PHP()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case 0:
                 {
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort) (0x0100 | SP);
-                    P.SetFlag(StatusRegisterFlags.B);
-                    CpuRead = false;
-                    UpdateRw();
-                    OutputAddressToPins(AddressBusAddress);
+                    BeginOpCode();
+                    UpdateRw(false);
+                    P.SetFlag(StatusRegisterFlags.B, true); //PHP pushes with the B flag as 1, no matter what
                     DataBusData = P.Register;
-                    OutputDataToDatabus();
+                    OutputDataToDatabus((ushort)(0x0100 | SP));
+                    P.SetFlag(StatusRegisterFlags.B);
                     SP--;
                     break;
                 }
                 case 1:
                 {
                     P.SetFlag(StatusRegisterFlags.B, false);
-                    AddressBusAddress = TempAddress;
                     AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    Read(AddressBusAddress);
                     EndOpCode();
                     break;
                 }
@@ -1724,27 +2662,27 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PLA()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
-                    SP++;
-                    TempAddress = AddressBusAddress;
-                    AddressBusAddress = (ushort) (0x0100 | SP);
-                    OutputAddressToPins(AddressBusAddress);
+                    BeginOpCode();
                     _instructionCycles++;
                     break;
                 }
                 case (1):
                 {
+                    SP++;
+                    Read((ushort)(0x0100 | SP));
+                    _instructionCycles++;
+                    break;
+                }
+                case (2):
+                {
                     A = DataBusData;
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-                    AddressBusAddress = TempAddress;
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+                    Read(AddressBusAddress);
                     EndOpCode();
                     break;
                 }
@@ -1756,14 +2694,13 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void PLP()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     SP++;
-                    OutputAddressToPins((ushort) (SP | 0x0100));
+                    Read((ushort)(SP | 0x0100));
                     _instructionCycles++;
                     break;
                 }
@@ -1772,6 +2709,7 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(DataBusData);
                     P.SetFlag(StatusRegisterFlags.B, false);
                     P.SetFlag(StatusRegisterFlags.Reserved, true);
+                    P.SetFlag(StatusRegisterFlags.I, true);
                     AddressBusAddress++;
                     EndOpCode();
                     break;
@@ -1780,7 +2718,41 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Rotate 1 bit left (Memory or Accumulator)
+        /// ROL (ROtate Left)
+        ///
+        /// ROL shifts all the bits left 1 position.
+        ///
+        /// The <see cref="StatusRegisterFlags.C"/> is shifted into bit 0 and
+        /// the original bit 7 is shifted into the <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ROL()
         {
@@ -1801,12 +2773,11 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) != 0);
 
                     if (OpCode == 0x2A)
-                        A = (byte) result;
+                        A = (byte)result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
                         OutputDataToDatabus();
                     }
 
@@ -1818,9 +2789,39 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Rotate 1 bit right (Memory or Accumulator)
+        /// ROR (ROtate Right)
         ///
-        /// C -> [76543210] -> C
+        /// ROR shifts all the bits right one position. The <see cref="StatusRegisterFlags.C"/> is shifted into bit 7 and the original
+        /// bit 0 is shifted into the <see cref="StatusRegisterFlags.C"/>
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Accumulator </term>
+        ///         <description>2 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>5 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>7 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void ROR()
         {
@@ -1841,12 +2842,11 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
 
                     if (OpCode == 0x6A)
-                        A = (byte) result;
+                        A = (byte)result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
                         OutputDataToDatabus();
                     }
 
@@ -1858,19 +2858,32 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Return from Interrupt
+        /// RTI (ReTurn from Interrupt
+        ///
+        /// RTI retrieves the <see cref="P"/> and the program counter form the stack
+        /// in that order.
+        /// <remarks>
+        /// Affects the following Flags
+        /// ALL
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void RTI()
         {
-            BeginOpCode();
-
             switch (_instructionCycles)
             {
                 case (0):
                 {
+                    BeginOpCode();
                     SP++;
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
                     _instructionCycles++;
                     break;
                 }
@@ -1880,8 +2893,8 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.B, P.HasFlag(StatusRegisterFlags.B));
                     P.SetFlag(StatusRegisterFlags.Reserved, P.HasFlag(StatusRegisterFlags.Reserved));
                     SP++;
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
                     _instructionCycles++;
                     break;
                 }
@@ -1889,16 +2902,16 @@ namespace Poly6502.Microprocessor
                 {
                     InstructionLoByte = DataBusData;
                     SP++;
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
+                    AddressBusAddress = (ushort)(0x0100 + SP);
+                    Read(AddressBusAddress);
                     _instructionCycles++;
                     break;
                 }
                 case (3):
                 {
                     InstructionHiByte = DataBusData;
-                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    OutputAddressToPins(AddressBusAddress);
+                    AddressBusAddress = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    Read(AddressBusAddress);
                     EndOpCode();
                     break;
                 }
@@ -1906,68 +2919,44 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Return from Subroutine
+        /// RTS (ReTurn from Subroutine)
+        ///
+        /// 
+        /// RTS pulls the top 2 bytes off the stack (little endian) and xfers
+        /// program control to (address + 1).
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void RTS()
-        {
-            BeginOpCode();
-
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    SP++;
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    InstructionLoByte = DataBusData;
-                    SP++;
-                    AddressBusAddress = (ushort) (0x0100 + SP);
-                    OutputAddressToPins(AddressBusAddress);
-                    _instructionCycles++;
-                    break;
-                }
-                case (2):
-                {
-                    InstructionHiByte = DataBusData;
-                    AddressBusAddress = (ushort) (InstructionHiByte << 8 | InstructionLoByte);
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
-                    EndOpCode();
-                    break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// Subtract Memory from Accumulator with Borrow
-        /// </summary>
-        public void SBC()
         {
             switch (_instructionCycles)
             {
                 case (0):
                 {
                     BeginOpCode();
+                    SP++;
+                    Read((ushort)(0x0100 | SP));
+                    AddressBusAddress = DataBusData;
                     _instructionCycles++;
                     break;
                 }
                 case (1):
                 {
-                    int result = A - DataBusData - (P.HasFlag(StatusRegisterFlags.C) ? 0 : 1);
-                    var overflow = ((A ^ result) & (~DataBusData ^ result) & 0x80) != 0;
-
-                    P.SetFlag(StatusRegisterFlags.C, (result & 0x100) == 0);
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.V, overflow);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    A = (byte) result;
-
+                    SP++;
+                    Read((ushort) (0x0100 + SP));
+                    AddressBusAddress |= (ushort)(DataBusData << 8);
+                    _instructionCycles++;
+                    break;
+                }
+                case (2):
+                {
                     AddressBusAddress++;
+                    Pc = AddressBusAddress;
+                    Read(AddressBusAddress);
                     EndOpCode();
                     break;
                 }
@@ -1975,62 +2964,184 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Set Carry Flag
+        /// SBC (SuBtract with Carry)
+        ///
+        /// SBC results are dependant on the setting of the <see cref="StatusRegisterFlags.D"/> flag.
+        ///
+        /// In decimal mode, subtraction is carried out on the assumption thgat values involved are packed BCD.
+        ///
+        /// There is no way to subtract without carry.
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.N"/>
+        /// <see cref="StatusRegisterFlags.Z"/>
+        /// <see cref="StatusRegisterFlags.V"/>
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Immediate Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
+        /// </summary>
+        public void SBC()
+        {
+            int result = A - DataBusData - (P.HasFlag(StatusRegisterFlags.C) ? 0 : 1);
+            var overflow = ((A ^ result) & (~DataBusData ^ result) & 0x80) != 0;
+
+            P.SetFlag(StatusRegisterFlags.C, (result & 0x100) == 0);
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.V, overflow);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            A = (byte)result;
+
+            AddressBusAddress++;
+            EndOpCode();
+        }
+
+        /// <summary>
+        /// SEC (SEt Carry)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.C"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void SEC()
         {
             P.SetFlag(StatusRegisterFlags.C);
             AddressBusAddress++;
             OpCodeInProgress = false;
+            EndOpCode();
         }
 
         /// <summary>
-        /// Set Decimal Mode
+        /// SED (SEt Decimal)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.D"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void SED()
         {
             P.SetFlag(StatusRegisterFlags.D);
             AddressBusAddress++;
-            OutputAddressToPins(AddressBusAddress);
+            Read(AddressBusAddress);
             EndOpCode();
         }
 
         /// <summary>
-        /// Set Interrupt Enable Status
+        /// SEI (SEt Interrupt)
+        ///
+        /// <remarks>
+        /// Affects the following Flags
+        /// <see cref="StatusRegisterFlags.I"/>
+        /// </remarks>
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
+        ///
         /// </summary>
         public void SEI()
         {
             P.SetFlag(StatusRegisterFlags.I, true);
             AddressBusAddress++;
-            OutputAddressToPins(AddressBusAddress);
+            Read(AddressBusAddress);
             EndOpCode();
         }
 
         /// <summary>
-        /// Store Accumulator in Memory
+        /// STA (STore Accumulator)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Zero Page: </term>
+        ///         <description>3 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Zero Page, X: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute: </term>
+        ///         <description>4 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, X: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Absolute, Y: </term>
+        ///         <description>4+ Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, X: </term>
+        ///         <description>6 Cycles</description>
+        ///     </item>
+        ///     <item>
+        ///         <term>Indirect, Y: </term>
+        ///         <description>5+ Cycles</description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void STA()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData = A;
-                    OutputDataToDatabus();
-                    OpCodeInProgress = false;
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            UpdateRw(false);
+            DataBusData = A;
+            OutputDataToDatabus(AddressBusAddress);
+            OpCodeInProgress = false;
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /// <summary>
@@ -2038,8 +3149,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void STX()
         {
-            CpuRead = false;
-            UpdateRw();
+            UpdateRw(false);
             DataBusData = X;
             OutputDataToDatabus();
             AddressBusAddress++;
@@ -2051,8 +3161,7 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void STY()
         {
-            CpuRead = false;
-            UpdateRw();
+            UpdateRw(false);
             DataBusData = Y;
             OutputDataToDatabus();
             AddressBusAddress++;
@@ -2060,12 +3169,18 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer Accumulator to Index X
+        /// TAX (Transfer A to X)
+        /// 
+        /// 
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void TAX()
         {
-            BeginOpCode();
-
             X = A;
             P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, X == 0);
@@ -2075,12 +3190,17 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer Accumulator to IndexY
+        /// TAY (Transfer A to Y)
+        ///
+        /// <list type="bullet">
+        ///     <item>
+        ///         <term>Implied Mode: </term>
+        ///         <description>2 Cycles: </description>
+        ///     </item>
+        /// </list>
         /// </summary>
         public void TAY()
         {
-            BeginOpCode();
-
             Y = A;
             P.SetFlag(StatusRegisterFlags.N, (Y & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, Y == 0);
@@ -2095,8 +3215,6 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void TSX()
         {
-            BeginOpCode();
-
             X = SP;
             P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, X == 0);
@@ -2106,12 +3224,10 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Transfer  Index X to Accumulator
+        /// TXA (Transfer X to A)
         /// </summary>
         public void TXA()
         {
-            BeginOpCode();
-
             A = X;
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
@@ -2125,66 +3241,49 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void TXS()
         {
-            BeginOpCode();
             SP = X;
-
-
             AddressBusAddress++;
+            _instructionCycles++;
             EndOpCode();
         }
 
         /// <summary>
-        /// Transfer Index Y to Accumulator
+        /// TYA (Transfer Y to A)
         /// </summary>
         public void TYA()
         {
-            BeginOpCode();
-
             A = Y;
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
-
+            _instructionCycles++;
             AddressBusAddress++;
             EndOpCode();
         }
 
         public void SLO()
         {
-            switch (_instructionCycles)
+            var result = DataBusData << 1;
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
+
+            if (OpCode == 0x0A)
+                A = (byte)result;
+            else
             {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var result = DataBusData << 1;
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, (result & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) > 0);
-
-                    if (OpCode == 0x0A)
-                        A = (byte) result;
-                    else
-                    {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
-                        OutputDataToDatabus();
-                    }
-                    A = (byte) (A | DataBusData);
-
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-
-                    AddressBusAddress++;
-
-                    EndOpCode();
-                    break;
-                }
+                UpdateRw(false);
+                DataBusData = (byte)result;
+                OutputDataToDatabus();
             }
+
+            A = (byte)(A | DataBusData);
+
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+
+            AddressBusAddress++;
+            _instructionCycles++;
+            EndOpCode();
         }
 
         public void RLA()
@@ -2206,19 +3305,24 @@ namespace Poly6502.Microprocessor
                     P.SetFlag(StatusRegisterFlags.C, (result & 0xFF00) != 0);
 
                     if (OpCode == 0x2A)
-                        A = (byte) result;
+                        A = (byte)result;
                     else
                     {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
+                        UpdateRw(false);
+                        DataBusData = (byte)result;
                         OutputDataToDatabus();
                     }
 
-                    A = (byte) (A & DataBusData);
+                    AddressBusAddress++;
+                    _instructionCycles++;
+                    break;
+                }
+                case (2):
+                {
+                    A = (byte)(A & DataBusData);
                     P.SetFlag(StatusRegisterFlags.Z, A == 0);
                     P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-                    AddressBusAddress++;
+            
                     EndOpCode();
                     break;
                 }
@@ -2227,87 +3331,58 @@ namespace Poly6502.Microprocessor
 
         public void SRE()
         {
-            switch (_instructionCycles)
+            P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
+            var result = DataBusData >> 1;
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+
+            if (OpCode == 0x4A)
+                A = (byte)result;
+            else
             {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
-                    var result = DataBusData >> 1;
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-
-                    if (OpCode == 0x4A)
-                        A = (byte) result;
-                    else
-                    {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
-                        OutputDataToDatabus();
-                    }
-
-                    A ^= DataBusData;
-
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-
-                    AddressBusAddress++;
-
-                    EndOpCode();
-                    break;
-                }
+            UpdateRw(false);
+            DataBusData = (byte)result;
+            OutputDataToDatabus();
             }
+
+            A ^= DataBusData;
+
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+
+            AddressBusAddress++;
+
+            EndOpCode();
         }
 
         public void RRA()
         {
-            switch (_instructionCycles)
+            var result = (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0) << 7 | DataBusData >> 1;
+
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
+
+            if (OpCode == 0x6A)
+                A = (byte)result;
+            else
             {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var result = (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0) << 7 | DataBusData >> 1;
-
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.C, (DataBusData & 0x01) != 0);
-
-                    if (OpCode == 0x6A)
-                        A = (byte) result;
-                    else
-                    {
-                        CpuRead = false;
-                        UpdateRw();
-                        DataBusData = (byte) result;
-                        OutputDataToDatabus();
-                    }
-
-                    result = A + DataBusData + (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
-                    var overflow = ((A ^ result) & (DataBusData ^ result) & 0x80) != 0;
-                    A = (byte) result;
-
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-                    P.SetFlag(StatusRegisterFlags.C, result > byte.MaxValue);
-                    P.SetFlag(StatusRegisterFlags.V, overflow);
-
-                    AddressBusAddress++;
-                    EndOpCode();
-
-                    break;
-                }
+                UpdateRw(false);
+                DataBusData = (byte)result;
+                OutputDataToDatabus();
             }
+
+            result = A + DataBusData + (P.HasFlag(StatusRegisterFlags.C) ? 1 : 0);
+            var overflow = ((A ^ result) & (DataBusData ^ result) & 0x80) != 0;
+            A = (byte)result;
+
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.C, result > byte.MaxValue);
+            P.SetFlag(StatusRegisterFlags.V, overflow);
+
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /// <summary>
@@ -2315,92 +3390,51 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void LAX()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    A = DataBusData;
-                    P.SetFlag(StatusRegisterFlags.Z, A == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
+            A = DataBusData;
+            P.SetFlag(StatusRegisterFlags.Z, A == 0);
+            P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
 
-                    X = A;
-                    P.SetFlag(StatusRegisterFlags.Z, X == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
-                    
-                    AddressBusAddress++;
-                    OutputAddressToPins(AddressBusAddress);
+            X = A;
+            P.SetFlag(StatusRegisterFlags.Z, X == 0);
+            P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
 
-                    EndOpCode();
-                    break;
-                }
-            }
+            AddressBusAddress++;
+            Read(AddressBusAddress);
+
+            EndOpCode();
         }
 
         public void SAX()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var temp = (byte)(A & X);
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData = temp;
-                    OutputDataToDatabus();
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            var temp = (byte)(A & X);
+            UpdateRw(false);
+            DataBusData = temp;
+            OutputDataToDatabus();
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         public void DCP()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var data = DataBusData - 1;
-                    
-                    P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
-                    
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData =  (byte) (data & 0x00FF);
-                    OutputDataToDatabus();
+            var data = DataBusData - 1;
 
-                    int comparison = (byte) (A - DataBusData);
-                    if (comparison is < 0 or > byte.MaxValue)
-                        comparison = 0;
+            P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
 
-                    P.SetFlag(StatusRegisterFlags.C, A >= DataBusData);
-                    P.SetFlag(StatusRegisterFlags.Z, (comparison & 0x00FF) == 0);
-                    P.SetFlag(StatusRegisterFlags.N, (comparison & 0x0080) != 0);
+            UpdateRw(false);
+            DataBusData = (byte)(data & 0x00FF);
+            OutputDataToDatabus();
 
-                    AddressBusAddress++;
-                    EndOpCode();
-                    break;
-                }
-            }
+            int comparison = (byte)(A - DataBusData);
+            if (comparison is < 0 or > byte.MaxValue)
+                comparison = 0;
+
+            P.SetFlag(StatusRegisterFlags.C, A >= DataBusData);
+            P.SetFlag(StatusRegisterFlags.Z, (comparison & 0x00FF) == 0);
+            P.SetFlag(StatusRegisterFlags.N, (comparison & 0x0080) != 0);
+
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         /*
@@ -2408,40 +3442,25 @@ namespace Poly6502.Microprocessor
          */
         public void ISC()
         {
-            switch (_instructionCycles)
-            {
-                case (0):
-                {
-                    BeginOpCode();
-                    _instructionCycles++;
-                    break;
-                }
-                case (1):
-                {
-                    var data = (DataBusData + 1);
-                    P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
-                    P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
+            var data = (DataBusData + 1);
+            P.SetFlag(StatusRegisterFlags.N, (data & 0x0080) != 0);
+            P.SetFlag(StatusRegisterFlags.Z, (data & 0x00FF) == 0);
 
-                    CpuRead = false;
-                    UpdateRw();
-                    DataBusData = (byte) (data & 0x00FF);
-                    OutputDataToDatabus();
-                    
-                    int result = A - DataBusData - (P.HasFlag(StatusRegisterFlags.C) ? 0 : 1);
-                    var overflow = ((A ^ result) & (~DataBusData ^ result) & 0x80) != 0;
+            UpdateRw(false);
+            DataBusData = (byte)(data & 0x00FF);
+            OutputDataToDatabus();
 
-                    P.SetFlag(StatusRegisterFlags.C, (result & 0x100) == 0);
-                    P.SetFlag(StatusRegisterFlags.Z, result == 0);
-                    P.SetFlag(StatusRegisterFlags.V, overflow);
-                    P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
-                    A = (byte) result;
+            int result = A - DataBusData - (P.HasFlag(StatusRegisterFlags.C) ? 0 : 1);
+            var overflow = ((A ^ result) & (~DataBusData ^ result) & 0x80) != 0;
 
-                    AddressBusAddress++;
-                    EndOpCode();
-                    
-                    break;
-                }
-            }
+            P.SetFlag(StatusRegisterFlags.C, (result & 0x100) == 0);
+            P.SetFlag(StatusRegisterFlags.Z, result == 0);
+            P.SetFlag(StatusRegisterFlags.V, overflow);
+            P.SetFlag(StatusRegisterFlags.N, (result & 0x80) != 0);
+            A = (byte)result;
+
+            AddressBusAddress++;
+            EndOpCode();
         }
 
         #endregion
@@ -2472,7 +3491,6 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void Ø1()
         {
-            Clock();
         }
 
         /// <summary>
@@ -2573,6 +3591,16 @@ namespace Poly6502.Microprocessor
             throw new NotImplementedException();
         }
 
+        public override byte Read(ushort address, bool ronly = false)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void Write(ushort address, byte data)
+        {
+            throw new NotImplementedException();
+        }
+
 
         /// <summary>
         /// Pin 37
@@ -2583,25 +3611,59 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public override void Clock()
         {
-            CpuRead = true;
-            UpdateRw();
-
             //Set the unused Flag
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
 
-            Console.WriteLine($"P {(byte) P.Register:X2}");
-            Fetch();
-            Execute();
-
-            if (!CpuRead) //Write any data required to the address bus
+            if (FetchInstruction)
             {
-                OutputDataToDatabus();
+                Fetch();
+                return; //fetching is always 1 cycle.
             }
 
-            if (!OpCodeInProgress)
+            Execute();
+
+            ClockComplete?.Invoke(this, null);
+        }
+
+        public void Fetch()
+        {
+            if (FetchInstruction)
             {
-                PC = AddressBusAddress;
+                _addressingModeCycles = 0;
+                _instructionCycles = 0;
+
+                AddressingModeInProgress = true;
+
+                foreach (var kvp in _dataCompatibleDevices)
+                {
+                    if (!kvp.Value.PropagationOverridden)
+                    {
+                        OpCode = kvp.Value.Read(Pc); //Read the opcode from the databus
+                    }
+                }
+
+                InstructionRegister = OpCodeLookupTable[OpCode]; //move the opcode to the IR
+
+                Pc++; //Increment the program counter
+                
+                FetchInstruction = false;
+
+                FetchComplete?.Invoke(this, null);
+            }
+        }
+
+        public void Execute()
+        {
+            if (AddressingModeInProgress)
+            {
+                InstructionRegister.AddressingModeMethod();
+            }
+
+            if (!AddressingModeInProgress)
+            {
+                OpCodeInProgress = true;
+                InstructionRegister.OpCodeMethod();
             }
         }
 
@@ -2619,63 +3681,48 @@ namespace Poly6502.Microprocessor
         {
         }
 
+        public void ProgramCounterInitialisation()
+        {
+            foreach (var kvp in _dataCompatibleDevices)
+            {
+                if (!kvp.Value.PropagationOverridden)
+                {
+                    InstructionLoByte = kvp.Value.Read(0xFFFC);
+                    InstructionHiByte = kvp.Value.Read(0xFFFD);
+
+                    Pc = (ushort)(InstructionHiByte << 8 | InstructionLoByte);
+                    AddressBusAddress = Pc;
+                }
+            }
+        }
+
         /// <summary>
         /// Pin 40
         /// RESET
         /// </summary>
-        public void RES()
+        public void RES(ushort address = 0x0000)
         {
-            //On a reset, the cpu will look at
-            //memory location 0xFFFC for an opcode to run
-            //this will take two cycles
-            //one for the lo byte, one for the hi byte.            
-            SP = 0xFD;
-
-            AddressBusAddress = 0xC000;
-            PC = 0xBFFF;
-            _instructionCycles = 2;
-            _pcCurrentFetchCycle = 2;
-            _indirectAddress = 0;
+            _instructionCycles = 0;
             _addressingModeCycles = 0;
-            AddressingModeInProgress = false;
-            _pcFetchComplete = false;
+
+            SP = 0xFD;
+            AddressBusAddress = 0x0000;
+            Pc = AddressBusAddress;
+            AddressingModeInProgress = true;
+            FetchInstruction = true;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
 
-
-            //output the address to the address bus
-            //so that, on the next cycle, data can be picked up
-            //outputted from ram/rom
-            OutputAddressToPins(AddressBusAddress);
-            UpdateRw();
-        }
-
-
-        public void Fetch()
-        {
-            if (!OpCodeInProgress)
+            if (address == 0x0000)
+                ProgramCounterInitialisation();
+            else
             {
-                OutputAddressToPins(AddressBusAddress);
-                OpCode = DataBusData;
+                Pc = address;
+                AddressBusAddress = address;
             }
-        }
 
-        private void DecodePc()
-        {
-        }
-
-
-        private void Execute()
-        {
-            var operation = OpCodeLookupTable[OpCode];
-
-            BeginOpCode();
-
-            operation.AddressingModeMethod();
-
-            if (!AddressingModeInProgress)
-                operation.OpCodeMethod();
+            UpdateRw(true);
         }
 
         private void BeginOpCode()
@@ -2684,24 +3731,32 @@ namespace Poly6502.Microprocessor
             {
                 OpCodeInProgress = true;
                 AddressingModeInProgress = true;
-                _instructionCycles = 0;
                 _addressingModeCycles = 0;
                 InstructionLoByte = 0;
                 InstructionHiByte = 0;
+                FetchInstruction = false;
             }
         }
 
         private void EndOpCode()
         {
             OpCodeInProgress = false;
-            AddressingModeInProgress = false;
-            _addressingModeCycles = 0;
-            _instructionCycles = 0;
+            AddressingModeInProgress = true;
+            FetchInstruction = true;
             CpuRead = true;
+            OpComplete?.Invoke(this, null);
+            AddressBusAddress++;
         }
 
-        private void OutputAddressToPins(ushort address)
+        private void SetData(byte databusData)
         {
+            _instructionCycles++;
+            DataBusData = databusData;
+        }
+
+        private byte Read(ushort address)
+        {
+#if EMULATE_PIN_OUTPUT
             //Address bus is uni directional.
             //Tell everything connected to the address bus the address
             foreach (var device in _addressCompatibleDevices)
@@ -2713,16 +3768,33 @@ namespace Poly6502.Microprocessor
                     device.AddressBusLines[i](data);
                 }
             }
+#else
+            foreach (var kvp in _dataCompatibleDevices)
+            {
+                if (!kvp.Value.PropagationOverridden)
+                {
+                    DataBusData = kvp.Value.Read(address);
+                }
+            }
+
+            return DataBusData;
+#endif
         }
 
-        private void UpdateRw()
+        private void UpdateRw(bool cpuRead)
         {
-            foreach (var busDevices in _dataCompatibleDevices)
+            CpuRead = cpuRead;
+            foreach (var kvp in _dataCompatibleDevices)
             {
-                busDevices.SetRW(CpuRead);
+                kvp.Value.SetRW(CpuRead);
             }
         }
 
         #endregion
+
+        private bool BoundaryCrossed()
+        {
+            return (AddressBusAddress & 0xFF00) != (InstructionHiByte << 8);
+        }
     }
 }

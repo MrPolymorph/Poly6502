@@ -31,7 +31,14 @@ namespace Poly6502.Microprocessor.Flags
         /// Interrupt Flag: This bit indicates if interrupts are enabled or masked.
         ///
         /// <remarks>
-        /// 1 = Disabled
+        /// 1 = Disabled.
+        /// 
+        /// The interrupt flag is used to prevent <see cref="M6502.SEI"/> or enable <see cref="M6502.CLI"/>
+        /// maskable interrupts (aka IRQ's). It does not signal the presence or absence of an interrupt condition.
+        ///
+        /// The 6502 will set this flag automatically in response to an interrupt and restore it to its prior status
+        /// on completion of the interrupt service routine. If you want your interrupt service routine to permit other
+        /// maskable interrupts, you must clear the <see cref="I"/> flag in your code.
         /// </remarks>
         /// </summary>
         private bool I;
@@ -40,7 +47,11 @@ namespace Poly6502.Microprocessor.Flags
         /// Decimal Flag:
         ///
         /// <remarks>
-        /// 1 = true
+        /// 1 = true.
+        ///
+        /// The decimal flag controls how the 6502 adds and subtracts. If set, arithmetic is carried out
+        /// in BCD. This flag is unchanged by interrupts and is unknown on power-up. The implication is that a CLD should
+        /// be included in boot or interrupt coding.
         /// </remarks>
         /// </summary>
         private bool D;
@@ -199,7 +210,14 @@ namespace Poly6502.Microprocessor.Flags
         /// Interrupt Flag: This bit indicates if interrupts are enabled or masked.
         ///
         /// <remarks>
-        /// 1 = Disabled
+        /// 1 = Disabled.
+        /// 
+        /// The interrupt flag is used to prevent <see cref="M6502.SEI"/> or enable <see cref="M6502.CLI"/>
+        /// maskable interrupts (aka IRQ's). It does not signal the presence or absence of an interrupt condition.
+        ///
+        /// The 6502 will set this flag automatically in response to an interrupt and restore it to its prior status
+        /// on completion of the interrupt service routine. If you want your interrupt service routine to permit other
+        /// maskable interrupts, you must clear the <see cref="I"/> flag in your code.
         /// </remarks>
         /// </summary>
         I,
@@ -208,7 +226,11 @@ namespace Poly6502.Microprocessor.Flags
         /// Decimal Flag:
         ///
         /// <remarks>
-        /// 1 = true
+        /// 1 = true.
+        ///
+        /// The decimal flag controls how the 6502 adds and subtracts. If set, arithmetic is carried out
+        /// in BCD. This flag is unchanged by interrupts and is unknown on power-up. The implication is that a CLD should
+        /// be included in boot or interrupt coding.
         /// </remarks>
         /// </summary>
         D,
@@ -225,7 +247,11 @@ namespace Poly6502.Microprocessor.Flags
         /// to fit in the register width using two's compliment representation.
         ///
         /// <remarks>
-        /// 1 = true
+        /// 1 = true.
+        ///
+        /// After an <see cref="M6502.ADC"/> or <see cref="M6502.SBC"/> instruction, the overflow flag will be set if
+        /// the 2's compliment result is less than -128 or greater than +127, and it will be cleared otherwise.
+        ///
         /// </remarks>
         /// </summary>
         V,

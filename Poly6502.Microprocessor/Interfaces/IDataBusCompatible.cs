@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
 
-namespace Poly6502.Interfaces
+namespace Poly6502.Microprocessor.Interfaces
 {
     public interface IDataBusCompatible : IClockable
     {
-        public Dictionary<int, Action<float>> DataBusLines { get; set; }
+        bool PropagationOverridden { get; }
         
-
+        Dictionary<int, Action<float>> DataBusLines { get; set; }
+        
         /// <summary>
         /// Set the read / write signal
         ///
@@ -18,5 +19,8 @@ namespace Poly6502.Interfaces
         void SetRW(bool rw);
 
         void PropagationOverride(bool ovr, object invoker);
+
+        byte Read(ushort address, bool ronly = false);
+        void Write(ushort address, byte data);
     }
 }
