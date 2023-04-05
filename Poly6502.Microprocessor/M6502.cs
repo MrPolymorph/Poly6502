@@ -798,9 +798,10 @@ namespace Poly6502.Microprocessor
                     AddressBusAddress = (ushort)((ushort)(InstructionHiByte << 8 | InstructionLoByte) + X);
                     break;
                 case 2:
+                    _operand = Read(AddressBusAddress);
+                    
                     if (!BoundaryCrossed())
                     {
-                        _operand = Read(AddressBusAddress);
                         AddressingModeInProgress = false;
                     }
                     
