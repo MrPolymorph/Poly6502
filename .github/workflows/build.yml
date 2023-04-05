@@ -38,9 +38,9 @@ jobs:
         restore-keys: ${{ runner.os }}-sonar-scanner
     - name: Install SonarCloud scanner
       if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
-      shell: pwsh
+      shell: sh
       run: |
-        New-Item -Path .\.sonar\scanner -ItemType Directory
+        mkdir .\.sonar\scanner -ItemType Directory
         dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
     - name: Build and analyze
       env:
