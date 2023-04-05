@@ -1,14 +1,14 @@
-name: .NET
+name: Build
 
 on:
   push:
     branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, opened, synchronize, reopened]
 
 jobs:
   build:
-
+    name: Build and analyze
     runs-on: ubuntu-latest
 
     steps:
