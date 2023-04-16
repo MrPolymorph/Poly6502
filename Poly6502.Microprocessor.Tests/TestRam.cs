@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Poly6502.Microprocessor.Models;
 using Poly6502.Microprocessor.Utilities;
 
 namespace Poly6502.Microprocessor.Tests;
@@ -30,16 +31,16 @@ public class TestRam : AbstractAddressDataBus
         CpuRead = rw;
     }
 
-    public override byte Read(ushort address, bool rOnly = false)
+    public override ReadResult Read(ushort address, bool rOnly = false)
     {
         //check if the address is meant for us?
         if (AddressBusAddress < MaxAddressableRange)
         {
             var actualAddress = address & 0x7FF;
-            return _ram[actualAddress];
+            return new ReadResult(_ram[actualAddress], true);
         }
 
-        return DataBusData;
+        return ReadResult;
     }
 
     public override void Write(ushort address, byte data)

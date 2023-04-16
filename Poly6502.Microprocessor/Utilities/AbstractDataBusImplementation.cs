@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Poly6502.Microprocessor.Interfaces;
+using Poly6502.Microprocessor.Models;
 
 namespace Poly6502.Microprocessor.Utilities
 {

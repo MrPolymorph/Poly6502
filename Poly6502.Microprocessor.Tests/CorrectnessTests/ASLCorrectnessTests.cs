@@ -18,9 +18,9 @@ public class ASLCorrectnessTests
 
         mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                 It.IsAny<bool>()))
-            .Returns(0xA9) //LDA
-            .Returns(0x04) //Operand
-            .Returns(0x0A); //ASL
+            .Returns(new ReadResult(0xA9, true)) //LDA
+            .Returns(new ReadResult(0x04, true)) //Operand
+            .Returns(new ReadResult(0x0A, true)); //ASL
 
         m6502.RegisterDevice(mockRam.Object, 1);
         
@@ -51,9 +51,9 @@ public class ASLCorrectnessTests
 
         mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                 It.IsAny<bool>()))
-            .Returns(0xA9) //LDA
-            .Returns(0x40) //Operand
-            .Returns(0x0A); //ASL
+            .Returns(new ReadResult(0xA9, true)) //LDA
+            .Returns(new ReadResult(0x04, true)) //Operand
+            .Returns(new ReadResult(0x0A, true)); //ASL
 
         m6502.RegisterDevice(mockRam.Object, 1);
         
@@ -85,9 +85,9 @@ public class ASLCorrectnessTests
 
         mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                 It.IsAny<bool>()))
-            .Returns(0xA9) //LDA
-            .Returns(0) //Operand
-            .Returns(0x0A); //ASL
+            .Returns(new ReadResult(0xA9, true)) //LDA
+            .Returns(new ReadResult(0, true)) //Operand
+            .Returns(new ReadResult(0x0A, true)); //ASL
 
         m6502.RegisterDevice(mockRam.Object, 1);
         
@@ -119,9 +119,9 @@ public class ASLCorrectnessTests
 
         mockRam.SetupSequence(x => x.Read(It.IsAny<ushort>(),
                 It.IsAny<bool>()))
-            .Returns(0xA9) //LDA
-            .Returns(0x80) //Operand
-            .Returns(0x0A); //ASL
+            .Returns(new ReadResult(0xA9, true)) //LDA
+            .Returns(new ReadResult(0x80, true)) //Operand
+            .Returns(new ReadResult(0x0A, true)); //ASL
 
         m6502.RegisterDevice(mockRam.Object, 1);
         

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Poly6502.Microprocessor.Interfaces;
+using Poly6502.Microprocessor.Models;
 using Poly6502.Microprocessor.Utilities.Arguments;
 
 namespace Poly6502.Microprocessor.Utilities
@@ -10,11 +11,8 @@ namespace Poly6502.Microprocessor.Utilities
     {
         private bool _ignorePropagation;
 
-        private ushort _addressBusAddress;
-        protected event EventHandler AddressChanged;
-        
-        protected readonly IDictionary<int, IAddressBusCompatible> _addressCompatibleDevices;
-        protected readonly IDictionary<int, IDataBusCompatible> _dataCompatibleDevices;
+        private readonly HashSet<IAddressBusCompatible> _addressCompatibleDevices;
+        protected readonly HashSet<IDataBusCompatible> DataCompatibleDevices;
         protected byte DataBusData { get; set; }
         protected bool CpuRead { get; set; }
         protected ushort RelativeAddress { get; set; }
@@ -23,30 +21,23 @@ namespace Poly6502.Microprocessor.Utilities
         public ushort MaxAddressableRange { get; protected set; }
         public ushort MinAddressableRange { get; protected set; }
 
-        public ushort AddressBusAddress
-        {
-            get => _addressBusAddress; 
-            protected set
-            {
-                AddressChanged?.Invoke(this, new AddressChangedEventArgs(_addressBusAddress, value));
-                _addressBusAddress = value;
-            }
-        }
-        
-        
+        public ushort AddressBusAddress { get; set; }
+
+
         public bool PropagationOverridden { get; private set; }
         public Dictionary<int, Action<float>> DataBusLines { get; set; }
         public Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
         protected AbstractAddressDataBus()
         {
+            DataBusData = 0;
             CpuRead = true;
             DataBusLines = new Dictionary<int, Action<float>>();
             AddressBusLines = new Dictionary<int, Action<float>>();
             
             _ignorePropagation = false;
-            _addressCompatibleDevices = new Dictionary<int, IAddressBusCompatible>();
-            _dataCompatibleDevices = new Dictionary<int, IDataBusCompatible>();
+            _addressCompatibleDevices = new HashSet<IAddressBusCompatible>();
+            DataCompatibleDevices = new HashSet<IDataBusCompatible>();
 
             PropagationOverridden = false;
 
@@ -80,37 +71,32 @@ namespace Poly6502.Microprocessor.Utilities
 #endif
         }
 
-        public void RegisterDevice(IAddressBusCompatible device, int propagationPriority)
+        public void RegisterDevice(IAddressBusCompatible device)
         {
-            if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
+            if (!_addressCompatibleDevices.Contains(device))
             {
-                _addressCompatibleDevices.Add(propagationPriority, device);
-            }
-
-            if (device is IDataBusCompatible compatible)
-            {
-                if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
-                    _dataCompatibleDevices.Add(propagationPriority, compatible);
+                _addressCompatibleDevices.Add(device);
+                
+                if (device is IDataBusCompatible compatible)
+                {
+                    if (!DataCompatibleDevices.Contains(compatible))
+                        DataCompatibleDevices.Add(compatible);
+                }
             }
         }
 
         public void RegisterDevice(IDataBusCompatible device,  int propagationPriority)
         {
-            if (!_dataCompatibleDevices.ContainsKey(propagationPriority))
+            if (!DataCompatibleDevices.Contains(device))
             {
-                _dataCompatibleDevices.Add(propagationPriority, device);
+                DataCompatibleDevices.Add(device);
+                
+                if (device is IAddressBusCompatible compatible)
+                {
+                    if (!_addressCompatibleDevices.Contains(compatible))
+                        _addressCompatibleDevices.Add(compatible);
+                }
             }
-
-            if (device is IAddressBusCompatible compatible)
-            {
-                if (!_addressCompatibleDevices.ContainsKey(propagationPriority))
-                    _addressCompatibleDevices.Add(propagationPriority, compatible);
-            }
-        }
-
-        public void RegisterDevice(IAddressBusCompatible device)
-        {
-            throw new NotImplementedException();
         }
 
         public void SetAddress(ushort address)
@@ -138,7 +124,7 @@ namespace Poly6502.Microprocessor.Utilities
         {
             if (!PropagationOverridden)
             {
-                foreach (var kvp in _dataCompatibleDevices.OrderBy(x => x.Key))
+                foreach (var kvp in DataCompatibleDevices)
                 {
 #if EMULATE_PIN_OUTPUT
                     for (int i = 0; i < 8; i++)
@@ -149,9 +135,9 @@ namespace Poly6502.Microprocessor.Utilities
                     }
 #else
                     if (CpuRead)
-                        DataBusData = kvp.Value.Read(address);
+                        DataBusData = kvp.Read(address);
                     else
-                        kvp.Value.Write(address, DataBusData);
+                        kvp.Write(address, DataBusData);
 #endif
                 }
             }
@@ -159,9 +145,9 @@ namespace Poly6502.Microprocessor.Utilities
 
         protected void SetPropagation(bool propagate)
         {
-            foreach (var device in _dataCompatibleDevices)
+            foreach (var device in DataCompatibleDevices)
             {
-                device.Value.PropagationOverride(propagate, this);
+                device.PropagationOverride(propagate, this);
             }
         }
 
