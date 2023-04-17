@@ -2046,13 +2046,9 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void LDA()
         {
-            
-            
             A = _operand;
             P.SetFlag(StatusRegisterFlags.Z, A == 0);
             P.SetFlag(StatusRegisterFlags.N, (A & 0x80) != 0);
-
-            
         }
 
         /// <summary>
@@ -3154,8 +3150,6 @@ namespace Poly6502.Microprocessor
             InstructionRegister = OpCodeLookupTable[OpCode]; //move the opcode to the IR
 
             Pc++; //Increment the program counter
-            
-            FetchInstruction = false;
 
             FetchComplete?.Invoke(this, null);
         }
@@ -3199,24 +3193,25 @@ namespace Poly6502.Microprocessor
         /// Pin 40
         /// RESET
         /// </summary>
-        public void RES(ushort address = 0x0000)
+        public void RES()
+        {
+            ProgramCounterInitialisation();
+            CommonReset();
+        }
+
+        public void RES(ushort address)
+        {
+            Pc = address;
+            AddressBusAddress = address;
+            CommonReset();
+        }
+
+        private void CommonReset()
         {
             SP = 0xFD;
-            AddressBusAddress = 0x0000;
-            Pc = AddressBusAddress;
-            FetchInstruction = true;
             CpuRead = true;
             P.SetFlag(StatusRegisterFlags.Reserved);
             P.SetFlag(StatusRegisterFlags.I);
-
-            if (address == 0x0000)
-                ProgramCounterInitialisation();
-            else
-            {
-                Pc = address;
-                AddressBusAddress = address;
-            }
-
             UpdateRw(true);
         }
 
