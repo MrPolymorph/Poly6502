@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Poly6502.Microprocessor.Models;
 using Poly6502.Microprocessor.Utilities;
 
 namespace Poly6502.Microprocessor.Tests;
@@ -38,8 +39,7 @@ public class TestRam : AbstractAddressDataBus
             var actualAddress = address & 0x7FF;
             return _ram[actualAddress];
         }
-
-        return DataBusData;
+        return 0;
     }
 
     public override void Write(ushort address, byte data)

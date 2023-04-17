@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Poly6502.Microprocessor.Models;
 
 namespace Poly6502.Microprocessor.Interfaces
 {
@@ -18,9 +19,8 @@ namespace Poly6502.Microprocessor.Interfaces
         /// <param name="rw"></param>
         void SetRW(bool rw);
 
-        void PropagationOverride(bool ovr, object invoker);
-
         byte Read(ushort address, bool ronly = false);
         void Write(ushort address, byte data);
+        public void PropagationOverride(bool ovr, object invoker);
     }
 }

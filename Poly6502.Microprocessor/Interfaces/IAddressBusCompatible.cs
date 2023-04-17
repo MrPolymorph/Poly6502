@@ -10,7 +10,7 @@ namespace Poly6502.Microprocessor.Interfaces
     
         Dictionary<int, Action<float>> AddressBusLines { get; set; }
 
-        void RegisterDevice(IAddressBusCompatible device, int propagationPriority);
+        void RegisterDevice(IAddressBusCompatible device);
 
         void SetAddress(ushort address);
     }
