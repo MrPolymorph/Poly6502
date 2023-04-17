@@ -31,16 +31,15 @@ public class TestRam : AbstractAddressDataBus
         CpuRead = rw;
     }
 
-    public override ReadResult Read(ushort address, bool rOnly = false)
+    public override byte Read(ushort address, bool rOnly = false)
     {
         //check if the address is meant for us?
         if (AddressBusAddress < MaxAddressableRange)
         {
             var actualAddress = address & 0x7FF;
-            return new ReadResult(_ram[actualAddress], true);
+            return _ram[actualAddress];
         }
-
-        return ReadResult;
+        return 0;
     }
 
     public override void Write(ushort address, byte data)
