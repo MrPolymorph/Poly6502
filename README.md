@@ -65,6 +65,27 @@ Once the build is complete, you can verify unit tests by running.
 dotnet test
 ```
 
+## How to use
+
+You can either build the project using the instructions in the build step, or you can reference the 
+latest nuget package in your project.
+
+create a new processor object with
+
+```C#
+var cpu = new M6502()
+```
+
+you can call RES to reset the CPU and pass in a value for the program counter.
+If you don't pass any value in, it will use the reset vector 0xFFFC 0xFFFD to pull the first opcode
+
+```C#
+var cpu = new M6502()
+cpu.RES(); //Reset using reset vector
+
+cpu.RES(0xC000); //set the program counter to 0xC000
+```
+
 ## Contributing
 
 ---
