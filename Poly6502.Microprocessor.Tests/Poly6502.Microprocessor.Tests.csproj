@@ -22,8 +22,4 @@
       <None Remove="Files\Klaus2m5Tests\6502_functional_test.bin" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="CycleTiming\" />
-    </ItemGroup>
-
 </Project>

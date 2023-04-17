@@ -65,6 +65,104 @@ Once the build is complete, you can verify unit tests by running.
 dotnet test
 ```
 
+## How to use
+
+You can either build the project using the instructions in the build step, or you can reference the 
+latest nuget package in your project.
+
+create a new processor object with
+
+```C#
+var cpu = new M6502()
+```
+
+you can call RES to reset the CPU and pass in a value for the program counter.
+If you don't pass any value in, it will use the reset vector 0xFFFC 0xFFFD to pull the first opcode
+
+
+
+```C#
+var cpu = new M6502()
+cpu.RES(); //Reset using reset vector
+
+cpu.RES(0xC000); //set the program counter to 0xC000
+```
+
+There are 2 important interfaces
+
+```C#
+IAddressBusCompatible 
+IDataBusCompatible
+```
+
+If you want a pre made implementation of these interfaces
+then your class can inherit from 
+
+```C#
+Poly6502.Microprocessor.Utilities.AbstractAddressDataBus
+```
+
+this implements both interfaces and provides a ready made implementation that might fit your need.
+You will however, still need to implement the Read / Write functions, the reason why should be obvious.
+
+For a bit of detail on the interfaces, read on.
+
+### IAddressBusCompatible
+ contains methods attributed to 'addressable' components, for example, those that could
+be attached to an 'address' bus.
+
+The most important of these is 
+
+```C#
+void RegisterDevice(IAddressBusCompatible device);
+```
+
+this will register and IAddressBusCompatible component.
+lets see this in action.
+
+For example, lets say we want to attach some RAM to the cpu.
+
+we create a RAM class and implement IAddressBusCompatible, once that is done
+we can register our ram with the CPU like so
+
+```C#
+var cpu = new M6502();
+var ram = new RAM();
+cpu.RegisterDevice(ram);
+```
+
+now when the CPU tries to read from a location it will attempt to read from RAM.
+
+### IDataBusCompatible
+
+As you can imagine, its best to implement this interface if you
+intend your class to be able to read or write data
+
+This interface exposes the following methods
+
+```C#
+    void SetRW(bool rw);
+    byte Read(ushort address, bool ronly = false);
+    void Write(ushort address, byte data);
+    void PropagationOverride(bool ovr, object invoker);
+```
+
+Read and Write are self explanatory, but PropagationOverride probably needs a bit of explanation.
+
+if you Implement IDataBusCompatible then you need to work out if the address sent to 
+you is for that device.
+
+If you only have 1 device attached to your CPU (like ram for example) you can pretty much ignore this and always set it to true.
+but if you have multiple devices then thigns get interesting.
+
+one of your devices will be within that addressable range, and when that happens, you should set the propogation override to 
+true, this will esentially override data from all other devices.
+
+This is needed because the CPU doesn't know anything about which devices attach to it do what, it just cares
+that it can read/write to those devices.
+
+If my words here dont make sense, check the 'Examples' folder. Otherwise, please submit a pr with change suggestions :)
+
 ## Contributing
 
 ---
@@ -82,7 +180,7 @@ There are lots of great resources out there, here are just a few to help you get
 
 | Link                                                            | Description              |
 |-----------------------------------------------------------------|--------------------------|
- | https://www.masswerk.at/6502/6502_instruction_set.html          | 6502 Instruction Set     |
+| https://www.masswerk.at/6502/6502_instruction_set.html          | 6502 Instruction Set     |
 | https://www.princeton.edu/~mae412/HANDOUTS/Datasheets/6502.pdf  | Synertek 6502 Data Sheet |
 | http://archive.6502.org/datasheets/rockwell_r650x_r651x.pdf     | Rockwell 6502 Data Sheet |
 | https://www.nesdev.org/wiki/Cycle_counting                      | Cycle Counting           |
