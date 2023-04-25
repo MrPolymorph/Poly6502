@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 using Poly6502.Microprocessor.Attributes;
 using Poly6502.Microprocessor.Flags;
 using Poly6502.Microprocessor.Models;
@@ -871,7 +872,8 @@ namespace Poly6502.Microprocessor
         /// </summary>
         public void LAS()
         {
-            throw new NotImplementedException();
+            LDA();
+            TSX();
         }
 
         /// <summary>
@@ -881,7 +883,7 @@ namespace Poly6502.Microprocessor
         [HighlyUnstable]
         public void LXA()
         {
-            throw new NotImplementedException();
+            A = X = (byte)(A & _operand);
         }
 
         /// <summary>
@@ -1423,15 +1425,16 @@ namespace Poly6502.Microprocessor
                     
             UpdateRw(true);
             AddressBusAddress = 0xFFFE;
-            Read(AddressBusAddress);
+            var loByte = Read(AddressBusAddress);
             
             AddressBusAddress = 0x0000;
             AddressBusAddress = DataBusData;
             AddressBusAddress = 0xFFFF;
-            Read(AddressBusAddress);
-            
-            AddressBusAddress = (ushort)(DataBusData << 8);
+            var hiByte = Read(AddressBusAddress);
             P.SetFlag(StatusRegisterFlags.B, false);
+            
+            Pc = AddressBusAddress = (ushort)(loByte | hiByte << 8);
+            
         }
 
         /// <summary>
@@ -3214,106 +3217,117 @@ namespace Poly6502.Microprocessor
         
         public IEnumerable<string> Disassemble(ushort startAddress, int stopAddress)
         {
-            ushort address = startAddress;
-            byte value, loByte, hiByte = 0x00;
+            ushort address = 0;
+            var sb = new StringBuilder();
             var mapLines = new List<string>();
-            var lineAddress = 0;
-
+            
             while (address <= stopAddress)
             {
-                lineAddress = address;
-                byte opCode = Read(address);
+                // Prefix line with instruction address
+                sb.Append($"${address:X4}: ");
+
+                // Read instruction, and get its readable name
+                var opCode = Read(address); 
                 address++;
                 var instruction = OpCodeLookupTable[opCode];
-                string sInstruction = $"${address:X4}: {instruction.OpCodeMethod.Method.Name}";
+                sb.Append(instruction.OpCodeMethod.Method.Name + " ");
 
-                if (instruction.AddressingModeMethod.Method.Name == nameof(IMP))
+                switch (instruction.AddressingModeMethod.Method.Name)
                 {
-                    sInstruction += " {IMP}";
+                    case nameof(IMP):
+                    {
+                        sb.Append(" {IMP}");
+                        break;
+                    }
+                    case nameof(IMM):
+                    {
+                        var value = Read(address);
+                        address++;
+                        sb.Append($"#${value:X2} {{IMM}}");
+                        break;
+                    }
+                    case nameof(ZPA):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        sb.Append($"${loByte:X2} {{ZPA}}");
+                        break;
+                    }
+                    case nameof(ZPX):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        sb.Append($"${loByte:X2}, X {{ZPX}}");
+                        break;
+                    }
+                    case nameof(ZPY):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        sb.Append($"${loByte:X2}, Y {{ZPY}}");
+                        break;
+                    }
+                    case nameof(IZX):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        sb.Append($"(${loByte:X2}, X) {{IZX}}");
+                        break;
+                    }
+                    case nameof(IZY):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        sb.Append($"(${loByte:X2}), Y {{IZY}}");
+                        break;
+                    }
+                    case nameof(ABS):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        var hiByte = Read(address);
+                        address++;
+                        sb.Append($"${(hiByte << 8 | loByte):X4} {{ABS}}");
+                        break;
+                    }
+                    case nameof(ABX):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        var hiByte = Read(address);
+                        address++;
+                        sb.Append($"${(hiByte << 8 | loByte):X4}, X {{ABX}}");
+                        break;
+                    }
+                    case nameof(ABY):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        var hiByte = Read(address);
+                        address++;
+                        sb.Append($"${(hiByte << 8 | loByte):X4}, Y {{ABY}}");
+                        break;
+                    }
+                    case nameof(IND):
+                    {
+                        var loByte = Read(address);
+                        address++;
+                        var hiByte = Read(address);
+                        address++;
+                        sb.Append($"(${(hiByte << 8 | loByte):X4}) {{IND}}");
+                        break;
+                    }
+                    case nameof(REL):
+                    {
+                        var value = Read(address);
+                        address++;
+                        sb.Append($"${value:X2} [${value:X4}] {{REL}}");
+                        break;
+                    }
                 }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(IMM))
-                {
-                    value = Read(address);
-                    sInstruction += $"#${value:X2} {{IMM}}";
-                    address++;
-                    
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPA))
-                {
-                    loByte = Read(address);
-                    sInstruction += $"${loByte:X2} {{ZPA}}";
-                    address++;
-                    
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPX))
-                {
-                    loByte = Read(address);
-                    sInstruction += $"${loByte:X2} , X {{ZPX}}";
-                    address++;
-                    
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPY))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = 0x00;
-                    sInstruction += $"${loByte:X2} , Y {{ZPY}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(IZX))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = 0x00;
-                    sInstruction += $"(${loByte:X2} , X) {{IZX}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(IZY))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = 0x00;
-                    sInstruction += $"(${loByte:X2}), Y {{IZY}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABS))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = Read(address);
-                    address++;
-                    sInstruction += $"${(hiByte << 8 | loByte):X4} {{ABS}}";
-                    address = (ushort) (hiByte << 8 | loByte);
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABX))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = Read(address);
-                    address++;
-                    sInstruction += $"${(hiByte << 8 | loByte):X4}, X {{ABX}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABY))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = Read(address);
-                    address++;
-                    sInstruction += $"${(hiByte << 8 | loByte):X4}, Y {{ABY}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(IND))
-                {
-                    loByte = Read(address);
-                    address++;
-                    hiByte = Read(address);
-                    address++;
-                    sInstruction += $"(${(hiByte << 8 | loByte):X4}) {{IND}}";
-                }
-                else if (instruction.AddressingModeMethod.Method.Name == nameof(REL))
-                {
-                    value = Read(address);
-                    address++;
-                    sInstruction += $"${value:X2}[${address:X4}] {{REL}}";
-                }
-
-                mapLines.Add(sInstruction);
+                
+                mapLines.Add(sb.ToString());
+                sb.Clear();
             }
 
             return mapLines;

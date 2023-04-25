@@ -173,11 +173,7 @@ namespace Poly6502.Microprocessor.Flags
 
         public override string ToString()
         {
-            string output =  $"{(C ? "C | " : string.Empty)} {(Z ? "Z | " : string.Empty)} {(I ? "I | " : string.Empty)}"; 
-                  output +=  $"{(D ? "D | " : string.Empty)} {(B ? "B | " : string.Empty)} {(Reserved ? "Reserved | " : string.Empty)}";
-                  output +=  $"{(V ? "V | " : string.Empty)} {(N ? "N | " : string.Empty)}  0x{Register}";
-
-            return output;
+            return $"C {(C ? 1:0)} | Z {(Z ? 1:0)} | I {(I ? 1:0)} | D {(D ? 1:0)} | B {(B ? 1:0)} | R 0 | V {(V ? 1:0)} | N {(N ? 1:0)} | Register: 0x{Register:X2}";
         }
     }
 
