@@ -534,6 +534,9 @@ namespace Poly6502.Microprocessor
 
                 /* LAS Illegal Opcodes */
                 { 0xBB, new Operation(LAS, ABY, 3, 4) },
+                
+                /* CBX */
+                { 0xCB, new Operation(SBX, IMM,2,2) }
             };
 
             RES();
@@ -2986,6 +2989,19 @@ namespace Poly6502.Microprocessor
             
         }
 
+        /*
+         * SBX (AXS, SAX) CMP and DEX at once, sets flags like CMP
+         *
+         * (A AND X) - oper -> X
+         */
+        public void SBX()
+        {
+            X = (byte) ((A & X) - _operand);
+            P.SetFlag(StatusRegisterFlags.Z, X == 0);
+            P.SetFlag(StatusRegisterFlags.N, (X & 0x80) != 0);
+            P.SetFlag(StatusRegisterFlags.C, P.HasFlag(StatusRegisterFlags.N));
+        }
+
         #endregion
 
         #region 6502 Pins
@@ -3227,7 +3243,7 @@ namespace Poly6502.Microprocessor
                 sb.Append($"${address:X4}: ");
 
                 // Read instruction, and get its readable name
-                var opCode = Read(address); 
+                byte opCode = Read(address); 
                 address++;
                 var instruction = OpCodeLookupTable[opCode];
                 sb.Append(instruction.OpCodeMethod.Method.Name + " ");
