@@ -133,6 +133,11 @@ namespace Poly6502.Microprocessor
         /// 16-Bit Program Counter
         /// </summary>
         public ushort Pc { get; set; }
+        
+        /// <summary>
+        /// 16-Bit Program Counter
+        /// </summary>
+        public ushort PcPreFetch { get; set; }
 
         /// <summary>
         /// The current instruction Lo Byte 
@@ -3075,7 +3080,7 @@ namespace Poly6502.Microprocessor
         }
 
         /// <summary>
-        /// Pin 34OpCode
+        /// Pin 34
         ///
         /// <remarks>
         /// 0 = Write
@@ -3149,6 +3154,7 @@ namespace Poly6502.Microprocessor
 
             InstructionRegister = OpCodeLookupTable[OpCode]; //move the opcode to the IR
 
+            PcPreFetch = Pc;
             Pc++; //Increment the program counter
 
             FetchComplete?.Invoke(this, null);
@@ -3204,6 +3210,113 @@ namespace Poly6502.Microprocessor
             Pc = address;
             AddressBusAddress = address;
             CommonReset();
+        }
+        
+        public IEnumerable<string> Disassemble(ushort startAddress, int stopAddress)
+        {
+            ushort address = startAddress;
+            byte value, loByte, hiByte = 0x00;
+            var mapLines = new List<string>();
+            var lineAddress = 0;
+
+            while (address <= stopAddress)
+            {
+                lineAddress = address;
+                byte opCode = Read(address);
+                address++;
+                var instruction = OpCodeLookupTable[opCode];
+                string sInstruction = $"${address:X4}: {instruction.OpCodeMethod.Method.Name}";
+
+                if (instruction.AddressingModeMethod.Method.Name == nameof(IMP))
+                {
+                    sInstruction += " {IMP}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(IMM))
+                {
+                    value = Read(address);
+                    sInstruction += $"#${value:X2} {{IMM}}";
+                    address++;
+                    
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPA))
+                {
+                    loByte = Read(address);
+                    sInstruction += $"${loByte:X2} {{ZPA}}";
+                    address++;
+                    
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPX))
+                {
+                    loByte = Read(address);
+                    sInstruction += $"${loByte:X2} , X {{ZPX}}";
+                    address++;
+                    
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ZPY))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = 0x00;
+                    sInstruction += $"${loByte:X2} , Y {{ZPY}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(IZX))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = 0x00;
+                    sInstruction += $"(${loByte:X2} , X) {{IZX}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(IZY))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = 0x00;
+                    sInstruction += $"(${loByte:X2}), Y {{IZY}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABS))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = Read(address);
+                    address++;
+                    sInstruction += $"${(hiByte << 8 | loByte):X4} {{ABS}}";
+                    address = (ushort) (hiByte << 8 | loByte);
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABX))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = Read(address);
+                    address++;
+                    sInstruction += $"${(hiByte << 8 | loByte):X4}, X {{ABX}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(ABY))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = Read(address);
+                    address++;
+                    sInstruction += $"${(hiByte << 8 | loByte):X4}, Y {{ABY}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(IND))
+                {
+                    loByte = Read(address);
+                    address++;
+                    hiByte = Read(address);
+                    address++;
+                    sInstruction += $"(${(hiByte << 8 | loByte):X4}) {{IND}}";
+                }
+                else if (instruction.AddressingModeMethod.Method.Name == nameof(REL))
+                {
+                    value = Read(address);
+                    address++;
+                    sInstruction += $"${value:X2}[${address:X4}] {{REL}}";
+                }
+
+                mapLines.Add(sInstruction);
+            }
+
+            return mapLines;
         }
 
         private void CommonReset()
